@@ -1,8 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { getUserEvents } from '../controllers/github';
+import { getUsersContributions } from '../controllers/github';
 
 const router = Router();
 
-router.get('/user/:user/events', getUserEvents);
+router.get('/users/contributions', getUsersContributions);
 
 export default router;

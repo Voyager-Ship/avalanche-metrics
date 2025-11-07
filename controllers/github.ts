@@ -3,14 +3,15 @@ import GithubMetrics from '../services/githubMetrics';
 
 const githubMetrics = new GithubMetrics();
 
-export const getUserEvents = async (req: Request, res: Response) => {
-  const user = req.params.user;
-  if (!user) return res.status(400).json({ error: 'user param required' });
+
+export const getUsersContributions = async (req: Request, res: Response) => {
+  const users = req.query.users?.toString().split(',');
+  if (!users) return res.status(400).json({ error: 'users query param required' });
 
   try {
-    const events = await githubMetrics.getEventsByUser(user);
+    const events = await githubMetrics.getContributionsByUsers(users);
     return res.json(events);
   } catch (err) {
-    res.status(500).json({ error: 'failed to fetch events', details: String(err) });
+    res.status(500).json({ error: 'failed to fetch contributions', details: String(err) });
   }
 };
