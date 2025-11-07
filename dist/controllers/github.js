@@ -3,21 +3,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserEvents = void 0;
+exports.getUsersContributions = void 0;
 const githubMetrics_1 = __importDefault(require("../services/githubMetrics"));
-// Pass the token explicitly from process.env so the service uses it directly.
-const githubMetrics = new githubMetrics_1.default(process.env.GITHUB_API_KEY);
-const getUserEvents = async (req, res) => {
-    const user = req.params.user;
-    if (!user)
-        return res.status(400).json({ error: 'user param required' });
+const githubMetrics = new githubMetrics_1.default();
+const getUsersContributions = async (req, res) => {
+    const users = req.query.users?.toString().split(',');
+    if (!users)
+        return res.status(400).json({ error: 'users query param required' });
     try {
-        const events = await githubMetrics.getEventsByUser(user);
+        const events = await githubMetrics.getContributionsByUsers(users);
         return res.json(events);
     }
     catch (err) {
-        res.status(500).json({ error: 'failed to fetch events', details: String(err) });
+        res.status(500).json({ error: 'failed to fetch contributions', details: String(err) });
     }
 };
-exports.getUserEvents = getUserEvents;
+exports.getUsersContributions = getUsersContributions;
 //# sourceMappingURL=github.js.map
