@@ -1,10 +1,12 @@
 import express from 'express';
 import indexRouter from './routes/index';
+import { apiKeyAuth } from './middlewares/auth'
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(apiKeyAuth)
 
 // Mount routes
 app.use('/', indexRouter);

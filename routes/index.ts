@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router } from 'express';
 import { getUsersContributions } from '../controllers/github';
 
 const router = Router();
