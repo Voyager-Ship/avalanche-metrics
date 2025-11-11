@@ -24,8 +24,6 @@ export default class GithubMetrics {
       const result = settled[i];
       if (result.status === "fulfilled") {
         const newContributions = result.value.filter((value) => !currentContributions.some(cc => cc.id === value.id))
-        console.log('New contributions for', user, ':', newContributions.length);
-        console.log('Current contributions for', user, ':', currentContributions.length);
         const oldContributions = currentContributions.filter(cc => cc.github_user_name === user)
         commits[user] = [...newContributions, ...oldContributions]
         newContributions.forEach(async (contribution) => {
