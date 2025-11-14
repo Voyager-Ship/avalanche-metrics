@@ -1,5 +1,4 @@
 // types/github-events.ts
-
 // actor/org shape used in the sample
 export interface Actor {
   id: number;
@@ -69,3 +68,14 @@ export type Event = CreateEvent | PushEvent | BaseEvent;
 
 // array type
 export type Events = Event[];
+
+export interface ProjectRepository {
+  id: string;
+  last_contribution: string;     // DATE → normalmente string (YYYY-MM-DD)
+  first_contribution: string;    // TEXT
+  repo_id: number;
+  repo_name: string;
+  user_id: string;
+  commits: number
+}
+
