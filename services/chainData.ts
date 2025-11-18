@@ -11,7 +11,7 @@ export default class ChainData {
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',
       [accounts]
     );
-    const contractsPromises = accounts.map(
+    const contractsPromises = accounts.filter((account) => !!account).map(
       async (account) =>
         (
           await axios.get<any>(
@@ -24,7 +24,7 @@ export default class ChainData {
     for (let i = 0; i < accounts.length; i++) {
       const account = accounts[i];
       const result = settledContracts[i];
-      if (result.status === "fulfilled") {
+      if (result && result.status === "fulfilled") {
         const newContracts = result.value.contracts.filter(
           (contract: ContractInfo) =>
             contract.address &&
@@ -78,7 +78,7 @@ export default class ChainData {
       } else {
         console.warn(
           `Failed to fetch contracts for account ${account}:`,
-          result.reason
+          result?.reason ?? ''
         );
       }
     }

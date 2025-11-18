@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Event, ProjectRepository } from "../types/github";
+import { ContributionsData, Event, ProjectRepository } from "../types/github";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
@@ -8,8 +8,8 @@ export default class GithubMetrics {
   public async getContributionsByUsersAndRepos(
     users: string[],
     repos: string[]
-  ): Promise<{ [user: string]: ProjectRepository[] | null }> {
-    const data: { [user: string]: ProjectRepository[] | null } = {};
+  ): Promise<ContributionsData> {
+    const data: ContributionsData = {};
     const currentRepos = await neonDb.query<ProjectRepository>(
       'SELECT * FROM "ProjectRepository" WHERE repo_name = ANY($1)',
       [repos]
@@ -32,11 +32,11 @@ export default class GithubMetrics {
         const currentUserRepos = currentRepos.filter(
           (repo) => repo.user_id == userId
         );
-        data[users[i]] = currentUserRepos.map((repo) => {
+        data[user] = currentUserRepos.map((repo) => {
           const newRepoContributions = result.value.filter(
             (e) =>
-              e.repo.name === repo.repo_name &&
-              new Date(e.created_at).getTime() >
+              e?.repo.name === repo.repo_name &&
+              new Date(e?.created_at).getTime() >
                 new Date(repo.last_contribution).getTime()
           );
           neonDb.query(
@@ -50,7 +50,7 @@ export default class GithubMetrics {
             [
               newRepoContributions.length,
               newRepoContributions[0]
-                ? newRepoContributions[0].created_at
+                ? newRepoContributions[0]?.created_at
                 : repo.last_contribution,
               repo.id,
             ]
@@ -59,7 +59,7 @@ export default class GithubMetrics {
           return {
             id: repo.id,
             last_contribution: newRepoContributions[0]
-              ? newRepoContributions[0].created_at
+              ? newRepoContributions[0]?.created_at
               : repo.last_contribution,
             first_contribution: repo.first_contribution,
             repo_id: repo.repo_id,
@@ -68,29 +68,21 @@ export default class GithubMetrics {
             commits: repo.commits + newRepoContributions.length,
           };
         });
-        const newRepos = repos.filter(
-          (repo) =>
-            !currentUserRepos.some(
-              (cr) =>
-                cr.repo_name === repo &&
-                result.value.some((e) => e.repo.name === repo)
-            )
+        const newRepos = repos.filter((repo) =>
+          result.value.some((r) => r.actor.login == user && r.repo.name == repo && !currentRepos.some((cr) => cr.repo_name == repo && cr.user_id == userId))
         );
         for (const repo of newRepos) {
-          const repoContributions = result.value.filter(
-            (e) => e.repo.name === repo
-          );
-          repoContributions.sort((a, b) =>
-            a.created_at.localeCompare(b.created_at)
-          );
+          const repoContributions = result.value
+            .filter((e) => e?.repo.name === repo && e.actor.login == user)
+            .sort((a, b) => a.created_at.localeCompare(b.created_at));
           const id = await neonDb.query<{ id: string }>(
             'INSERT INTO "ProjectRepository" (last_contribution, first_contribution, repo_id, repo_name, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
             [
-              new Date(repoContributions[0].created_at).getTime(),
+              new Date(repoContributions[0]?.created_at).getTime(),
               new Date(
-                repoContributions[repoContributions.length - 1].created_at
+                repoContributions[repoContributions.length - 1]?.created_at
               ).getTime(),
-              repoContributions[0].repo.id,
+              repoContributions[0]?.repo.id,
               repo,
               userId,
             ]
@@ -98,14 +90,14 @@ export default class GithubMetrics {
           data[user]?.push({
             id: id[0].id,
             first_contribution: new Date(
-              repoContributions[repoContributions.length - 1].created_at
+              repoContributions[repoContributions.length - 1]?.created_at
             )
               .getTime()
               .toString(),
-            last_contribution: new Date(repoContributions[0].created_at)
+            last_contribution: new Date(repoContributions[0]?.created_at)
               .getTime()
               .toString(),
-            repo_id: repoContributions[0].repo.id,
+            repo_id: repoContributions[0]?.repo.id,
             repo_name: repo,
             user_id: userId,
             commits: repoContributions.length,

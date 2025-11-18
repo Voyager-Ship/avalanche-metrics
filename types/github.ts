@@ -78,4 +78,5 @@ export interface ProjectRepository {
   user_id: string;
   commits: number
 }
+export interface ContributionsData { [user: string]: ProjectRepository[]}
 
