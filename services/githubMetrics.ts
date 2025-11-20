@@ -11,7 +11,7 @@ export default class GithubMetrics {
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
     const currentRepos = await neonDb.query<ProjectRepository>(
-      'SELECT * FROM "ProjectRepository" WHERE repo_name = ANY($1)',
+      'SELECT * FROM "Repository" WHERE repo_name = ANY($1)',
       [repos]
     );
     const eventsPromises = users.map(
@@ -41,7 +41,7 @@ export default class GithubMetrics {
           );
           neonDb.query(
             `
-  UPDATE "ProjectRepository"
+  UPDATE "Repository"
   SET 
     commits = commits + $1,
     last_contribution = $2
@@ -76,7 +76,7 @@ export default class GithubMetrics {
             .filter((e) => e?.repo.name === repo && e.actor.login == user)
             .sort((a, b) => a.created_at.localeCompare(b.created_at));
           const id = await neonDb.query<{ id: string }>(
-            'INSERT INTO "ProjectRepository" (last_contribution, first_contribution, repo_id, repo_name, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            'INSERT INTO "Repository" (last_contribution, first_contribution, repo_id, repo_name, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
             [
               new Date(repoContributions[0]?.created_at).getTime(),
               new Date(

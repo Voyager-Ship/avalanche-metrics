@@ -7,6 +7,6 @@ const router = Router();
 
 router.get('/users/contributions', getUsersContributions);
 router.get('/users/chainData', getChainData);
-router.get('/merge', getMergeData);
+router.get('/users/activity', getMergeData);
 
 export default router;
