@@ -16,7 +16,7 @@ export default class GithubMetrics {
       reposNames
     );
     const newRepos = currentRepos.filter((repo) => repo.repo_id == null);
-    console.log(newRepos);
+    this.insertNewRepos(newRepos, events, users)
     return data;
   }
 
@@ -73,19 +73,25 @@ export default class GithubMetrics {
   ) {
     const reposToInsert: ProjectRepository[] = [];
     users.forEach((user) => {
-      reposToInsert.push(
-        ...repos.filter(
-          (repo) =>
-            repo.user_id == user.id &&
-            events.some(
-              (event) =>
-                event.actor.login == user.github_user_name &&
-                repo.repo_name.split(",").some((repoName) => repoName == event.repo.name)
-            )
-        )
-      );
+      repos.forEach((repo) => {
+        const reposNames = repo.repo_name.split(",").map((r) => r.trim());
+
+        reposNames.forEach((singleName) => {
+          const hasEvent = events.some(
+            (event) =>
+              event.actor.login === user.github_user_name &&
+              event.repo.name === singleName.replace('https://api.github.com/repos/', '')
+          );
+          if (hasEvent) {
+            reposToInsert.push({
+              ...repo,
+              repo_name: singleName
+            })
+          }
+        });
+      });
     });
-    console.log(reposToInsert)
+    console.log('Repos to insert: ', reposToInsert)
     // neonDb.query(
     //   `INSET INTO "Repository" ( repo_id, repo_name, user_id, commits, first_contribution, last_contribution)  SELECT * FROM UNNEST ($1::text[], $2::text[], $3::text[], $4::int[], $5::int[], $6::int[])`,
     //   [repos.map((repo) => repo.id), repos.map((repo) => repo.repo_name)]
