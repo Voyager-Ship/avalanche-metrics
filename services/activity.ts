@@ -8,7 +8,7 @@ const chainData = new ContractsService();
 
 export default class Activity {
   constructor() {}
-  public async getUsersActivity(users: string[], repos: string[]) {
+  public async getUsersActivity(users: string[], projects: string[]) {
     const data: MergeData = {};
     const result = await neonDb.query<any>(
       `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.awarded_at
@@ -39,7 +39,7 @@ export default class Activity {
 
     const contributions = await githubMetrics.getContributionsByUsersAndProjects(
       dbUsers.map((user) => user.github_user_name),
-      repos
+      projects
     );
     const contracts = await chainData.getContractsByAddresses(
       dbUsers.map((user) => user.address)

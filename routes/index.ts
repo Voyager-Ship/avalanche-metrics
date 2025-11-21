@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getUsersContributions } from '../controllers/github';
 import { getAdressesContracts } from '../controllers/chain';
-import { getUsersActivity } from '../controllers/merge';
+import { getUsersActivity } from '../controllers/activity';
 
 const router = Router();
 
