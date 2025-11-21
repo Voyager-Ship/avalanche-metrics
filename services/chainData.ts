@@ -2,10 +2,10 @@ import axios from "axios";
 import { ChainData as ChainDataType, ContractInfo } from "../types/chain";
 import { neonDb } from "./neon";
 
-export default class ChainData {
+export default class ContractsService {
   constructor() {}
 
-  public async getChainDataByUsers(accounts: string[]): Promise<ChainDataType> {
+  public async getContractsByAddresses(accounts: string[]): Promise<ChainDataType> {
     let data: ChainDataType = {};
     const currentContracts = await neonDb.query(
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',

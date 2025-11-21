@@ -1,20 +1,34 @@
 import axios from "axios";
 import { ContributionsData, Event, ProjectRepository } from "../types/github";
+import { User } from "../types/user";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
   constructor() {}
 
-  public async getContributionsByUsersAndRepos(
-    users: string[],
-    repos: string[]
+  public async getContributionsByUsersAndProjects(
+    githubUsersNames: string[],
+    reposNames: string[]
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
-    const currentRepos = await neonDb.query<ProjectRepository>(
-      'SELECT * FROM "Repository" WHERE repo_name = ANY($1)',
-      [repos]
+    const { currentRepos, events, users } = await this.getContributionsData(
+      githubUsersNames,
+      reposNames
     );
-    const eventsPromises = users.map(
+    const newRepos = currentRepos.filter((repo) => repo.repo_id == null);
+    console.log(newRepos);
+    return data;
+  }
+
+  private async getContributionsData(
+    githubUsersNames: string[],
+    projectsNames: string[]
+  ): Promise<{
+    currentRepos: ProjectRepository[];
+    events: Event[];
+    users: User[];
+  }> {
+    const usersEventsPromises = githubUsersNames.map(
       async (user) =>
         (
           await axios.get<Event[]>(
@@ -22,104 +36,59 @@ export default class GithubMetrics {
           )
         ).data
     );
-    const settled = await Promise.allSettled(eventsPromises);
-    for (let i = 0; i < users.length; i++) {
-      const user = users[i];
-      const result = settled[i];
-      if (result.status === "fulfilled") {
-        const userId = await this.ensureUserId(user);
-        if (!userId) continue;
-        const currentUserRepos = currentRepos.filter(
-          (repo) => repo.user_id == userId
-        );
-        data[user] = currentUserRepos.map((repo) => {
-          const newRepoContributions = result.value.filter(
-            (e) =>
-              e?.repo.name === repo.repo_name &&
-              new Date(e?.created_at).getTime() >
-                new Date(repo.last_contribution).getTime()
-          );
-          neonDb.query(
-            `
-  UPDATE "Repository"
-  SET 
-    commits = commits + $1,
-    last_contribution = $2
-  WHERE id = $3
-  `,
-            [
-              newRepoContributions.length,
-              newRepoContributions[0]
-                ? newRepoContributions[0]?.created_at
-                : repo.last_contribution,
-              repo.id,
-            ]
-          );
-
-          return {
-            id: repo.id,
-            last_contribution: newRepoContributions[0]
-              ? newRepoContributions[0]?.created_at
-              : repo.last_contribution,
-            first_contribution: repo.first_contribution,
-            repo_id: repo.repo_id,
-            repo_name: repo.repo_name,
-            user_id: repo.user_id,
-            commits: repo.commits + newRepoContributions.length,
-          };
-        });
-        const newRepos = repos.filter((repo) =>
-          result.value.some((r) => r.actor.login == user && r.repo.name == repo && !currentRepos.some((cr) => cr.repo_name == repo && cr.user_id == userId))
-        );
-        for (const repo of newRepos) {
-          const repoContributions = result.value
-            .filter((e) => e?.repo.name === repo && e.actor.login == user)
-            .sort((a, b) => a.created_at.localeCompare(b.created_at));
-          const id = await neonDb.query<{ id: string }>(
-            'INSERT INTO "Repository" (last_contribution, first_contribution, repo_id, repo_name, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-            [
-              new Date(repoContributions[0]?.created_at).getTime(),
-              new Date(
-                repoContributions[repoContributions.length - 1]?.created_at
-              ).getTime(),
-              repoContributions[0]?.repo.id,
-              repo,
-              userId,
-            ]
-          );
-          data[user]?.push({
-            id: id[0].id,
-            first_contribution: new Date(
-              repoContributions[repoContributions.length - 1]?.created_at
-            )
-              .getTime()
-              .toString(),
-            last_contribution: new Date(repoContributions[0]?.created_at)
-              .getTime()
-              .toString(),
-            repo_id: repoContributions[0]?.repo.id,
-            repo_name: repo,
-            user_id: userId,
-            commits: repoContributions.length,
-          });
-        }
+    const settled = await Promise.allSettled(usersEventsPromises);
+    const events: Event[] = [];
+    settled.forEach((userEvents) => {
+      if (userEvents.status == "fulfilled") {
+        events.push(...userEvents.value);
       }
-    }
-    return data;
-  }
-  private async ensureUserId(
-    githubUserName: string
-  ): Promise<string | undefined> {
-    const found = await neonDb.query<{ id: string }>(
-      'SELECT id FROM "User" WHERE github_user_name = $1 LIMIT 1',
-      [githubUserName]
+    });
+    const currentRepos = await neonDb.query<
+      ProjectRepository & { project_name: string }
+    >(
+      `
+  SELECT r.*, p.github_repository AS repo_name,  p.project_name
+  FROM "Project" p
+  LEFT JOIN "ProjectRepository" pr ON pr.project_id = p.id
+  LEFT JOIN "Repository" r ON pr.repository_id = r.id
+  WHERE p.project_name = ANY($1)
+  `,
+      [projectsNames]
     );
-    if (found.length > 0) return found[0].id;
 
-    const inserted = await neonDb.query<{ id: string }>(
-      'INSERT INTO "User" (github_user_name) VALUES ($1) RETURNING id',
-      [githubUserName]
+    const users = await neonDb.query<User>(
+      'SELECT * FROM "User" WHERE github_user_name = ANY($1)',
+      [githubUsersNames]
     );
-    if (inserted.length > 0) return inserted[0].id;
+    return {
+      events: events,
+      currentRepos: currentRepos,
+      users: users,
+    };
+  }
+  private async insertNewRepos(
+    repos: ProjectRepository[],
+    events: Event[],
+    users: User[]
+  ) {
+    const reposToInsert: ProjectRepository[] = [];
+    users.forEach((user) => {
+      reposToInsert.push(
+        ...repos.filter(
+          (repo) =>
+            repo.user_id == user.id &&
+            events.some(
+              (event) =>
+                event.actor.login == user.github_user_name &&
+                repo.repo_name.split(",").some((repoName) => repoName == event.repo.name)
+            )
+        )
+      );
+    });
+    console.log(reposToInsert)
+    // neonDb.query(
+    //   `INSET INTO "Repository" ( repo_id, repo_name, user_id, commits, first_contribution, last_contribution)  SELECT * FROM UNNEST ($1::text[], $2::text[], $3::text[], $4::int[], $5::int[], $6::int[])`,
+    //   [repos.map((repo) => repo.id), repos.map((repo) => repo.repo_name)]
+    // );
   }
 }

@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { getUsersContributions } from '../controllers/github';
-import { getChainData } from '../controllers/chain';
-import { getMergeData } from '../controllers/merge';
+import { getAdressesContracts } from '../controllers/chain';
+import { getUsersActivity } from '../controllers/merge';
 
 const router = Router();
 
 router.get('/users/contributions', getUsersContributions);
-router.get('/users/chainData', getChainData);
-router.get('/users/activity', getMergeData);
+router.get('/users/contracts', getAdressesContracts);
+router.get('/users/activity', getUsersActivity);
 
 export default router;

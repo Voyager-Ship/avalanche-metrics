@@ -48,7 +48,7 @@ export interface BaseEvent {
   repo: Repo;
   payload: GenericPayload;
   public: boolean;
-  created_at: string;   // ISO timestamp like "2025-11-06T23:47:43Z"
+  created_at: number;   // ISO timestamp like "2025-11-06T23:47:43Z"
   org?: Actor;          // org has same shape as actor in your sample
 }
 
@@ -71,8 +71,8 @@ export type Events = Event[];
 
 export interface ProjectRepository {
   id: string;
-  last_contribution: string;     // DATE → normalmente string (YYYY-MM-DD)
-  first_contribution: string;    // TEXT
+  last_contribution: number;     // DATE → normalmente string (YYYY-MM-DD)
+  first_contribution: number;    // TEXT
   repo_id: number;
   repo_name: string;
   user_id: string;
