@@ -20,11 +20,16 @@ export default class GithubMetrics {
     newRepos = await this.insertNewRepos(newRepos, events, users);
     let currentRepos = repos.filter((repo) => repo.repo_id != null);
     await this.updateCurrentRepos(currentRepos, events, users);
-    users.forEach((user) => {
-      data[user.github_user_name] = [
-        ...newRepos.filter((repo) => repo.user_id == user.id),
-        ...currentRepos.filter((repo) => repo.user_id == user.id),
-      ];
+    githubUsersNames.forEach((userName) => {
+      const user = users.find((u) => u.github_user_name == userName);
+      if (user) {
+        data[user.github_user_name] = [
+          ...newRepos.filter((repo) => repo.user_id == user.id),
+          ...currentRepos.filter((repo) => repo.user_id == user.id),
+        ];
+      } else {
+        data[userName] = [];
+      }
     });
     return data;
   }
@@ -69,7 +74,15 @@ export default class GithubMetrics {
     );
     return {
       events: events,
-      repos: projectsRepos,
+      repos: projectsRepos.map((pr) => ({
+        ...pr,
+        last_contribution: pr.last_contribution
+          ? Number(pr.last_contribution)
+          : 0,
+        first_contribution: pr.first_contribution
+          ? Number(pr.first_contribution)
+          : 0,
+      })),
       users: users,
     };
   }
@@ -143,8 +156,6 @@ export default class GithubMetrics {
       reposToInsert[i].id = row.id;
     });
 
-    console.log(reposToInsert);
-
     await neonDb.query(
       `
     INSERT INTO "ProjectRepository" (project_id, repository_id)
@@ -176,15 +187,19 @@ export default class GithubMetrics {
         reposNames.forEach((singleName) => {
           const newReposEvents = events.filter(
             (event) =>
+              new Date(event.created_at).getTime() > repo.last_contribution &&
               event.actor.login === user.github_user_name &&
               event.repo.name ===
                 singleName.replace("https://api.github.com/repos/", "")
           );
+          console.log('New repos events: ', newReposEvents);
           if (newReposEvents.length > 0) {
             reposToUpdate.push({
               ...repo,
               commits: repo.commits + newReposEvents.length,
-              last_contribution: new Date(newReposEvents[0].created_at).getTime(),
+              last_contribution: new Date(
+                newReposEvents[0].created_at
+              ).getTime(),
             });
           }
         });

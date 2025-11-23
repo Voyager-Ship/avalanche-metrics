@@ -5,4 +5,5 @@ export interface Badge {
   points: number;
   category: string;
   awarded_at: string;
+  evidence: any
 }

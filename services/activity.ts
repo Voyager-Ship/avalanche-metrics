@@ -11,7 +11,7 @@ export default class Activity {
   public async getUsersActivity(users: string[], projects: string[]) {
     const data: MergeData = {};
     const result = await neonDb.query<any>(
-      `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.awarded_at
+      `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.evidence, ub.awarded_at
    FROM "User" u
    LEFT JOIN "UserBadge" ub ON u.id = ub.user_id
    LEFT JOIN "Badge" b ON ub.badge_id = b.id
@@ -33,14 +33,18 @@ export default class Activity {
         description: row.description,
         category: row.category,
         points: row.points,
-        awarded_at: row.awarded_at,
         user_id: row.id,
+        awarded_at: row.awarded_at,
+        evidence: row.evidence.map((e: any) => ({
+          id: e.id,
+        })),
       }));
 
-    const contributions = await githubMetrics.getContributionsByUsersAndProjects(
-      dbUsers.map((user) => user.github_user_name),
-      projects
-    );
+    const contributions =
+      await githubMetrics.getContributionsByUsersAndProjects(
+        dbUsers.map((user) => user.github_user_name),
+        projects
+      );
     const contracts = await chainData.getContractsByAddresses(
       dbUsers.map((user) => user.address)
     );
@@ -57,6 +61,7 @@ export default class Activity {
             category: badge.category,
             points: badge.points,
             awarded_at: new Date(badge.awarded_at).getTime().toString(),
+            evidence: badge.evidence,
           })),
       };
     });
