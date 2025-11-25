@@ -1,10 +1,12 @@
 import axios from "axios";
 import { ContributionsData, Event, ProjectRepository } from "../types/github";
+import { createRateLimiter } from "../utils/resilienceMethods";
 import { User } from "../types/user";
 import { Project } from "../types/project";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
+  private limiter = createRateLimiter(3);
   constructor() {}
 
   public async getContributionsByUsersAndProjects(
@@ -46,13 +48,13 @@ export default class GithubMetrics {
     events: Event[];
     users: User[];
   }> {
-    const usersEventsPromises = githubUsersNames.map(
-      async (user) =>
-        (
-          await axios.get<Event[]>(
-            `https://api.github.com/users/${user}/events`
-          )
-        ).data
+    const usersEventsPromises = githubUsersNames.map((user) =>
+      this.limiter(async () => {
+        const res = await axios.get<Event[]>(
+          `https://api.github.com/users/${user}/events`
+        );
+        return res.data;
+      })
     );
     const settled = await Promise.allSettled(usersEventsPromises);
     const events: Event[] = [];
