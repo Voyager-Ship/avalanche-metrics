@@ -6,6 +6,7 @@ export default class ContractsService {
   constructor() {}
 
   public async getContractsByAddresses(accounts: string[]): Promise<ChainDataType> {
+    console.log("Accounts: ", accounts)
     let data: ChainDataType = {};
     const currentContracts = await neonDb.query(
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',

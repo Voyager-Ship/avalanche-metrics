@@ -46,7 +46,9 @@ export default class Activity {
         projects
       );
     const contracts = await chainData.getContractsByAddresses(
-      dbUsers.map((user) => user.address)
+      dbUsers
+        .filter((dbUsers) => dbUsers.address != null)
+        .map((user) => user.address)
     );
     dbUsers.forEach((user) => {
       data[user.github_user_name] = {
