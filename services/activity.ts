@@ -10,7 +10,7 @@ export default class Activity {
   constructor() {}
   public async getUsersActivity(users: string[], projects: string[]) {
     const data: MergeData = {};
-    const result = await neonDb.query<any>(
+    const usersBadgesData = await neonDb.query<any>(
       `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.evidence, ub.awarded_at
    FROM "User" u
    LEFT JOIN "UserBadge" ub ON u.id = ub.user_id
@@ -19,13 +19,13 @@ export default class Activity {
       [users]
     );
 
-    const dbUsers = result.map((row) => ({
+    const dbUsers = usersBadgesData.map((row) => ({
       id: row.id,
       github_user_name: row.github_user_name,
       address: row.address,
     }));
 
-    const badges = result
+    const badges = usersBadgesData
       .filter((row) => row.badge_id !== null)
       .map((row) => ({
         id: row.badge_id,

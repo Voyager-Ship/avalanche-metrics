@@ -12,14 +12,18 @@ export default class GithubMetrics {
     reposNames: string[]
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
+
     const { repos, events, users } = await this.getContributionsData(
       githubUsersNames,
       reposNames
     );
+
     let newRepos = repos.filter((repo) => repo.repo_id == null);
     newRepos = await this.insertNewRepos(newRepos, events, users);
+
     let currentRepos = repos.filter((repo) => repo.repo_id != null);
     await this.updateCurrentRepos(currentRepos, events, users);
+
     githubUsersNames.forEach((userName) => {
       const user = users.find((u) => u.github_user_name == userName);
       if (user) {
@@ -192,7 +196,6 @@ export default class GithubMetrics {
               event.repo.name ===
                 singleName.replace("https://api.github.com/repos/", "")
           );
-          console.log('New repos events: ', newReposEvents);
           if (newReposEvents.length > 0) {
             reposToUpdate.push({
               ...repo,
