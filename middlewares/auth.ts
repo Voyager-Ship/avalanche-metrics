@@ -1,6 +1,6 @@
 // ...existing code...
 import { Request, Response, NextFunction } from 'express';
-import { MASTER_API_KEY } from '../constants/constants';
+import { AUTH_API_KEY } from '../constants/constants';
 
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
 
@@ -9,7 +9,7 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
 
   let key = header;
 
-  const envKey = MASTER_API_KEY;
+  const envKey = AUTH_API_KEY;
   if (!envKey) return res.status(500).json({ error: 'server misconfiguration: API_KEY not set' });
 
   if (key !== envKey) return res.status(401).json({ error: 'invalid api key' });

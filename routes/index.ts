@@ -5,8 +5,8 @@ import { getUsersActivity } from '../controllers/activity';
 
 const router = Router();
 
-router.get('/users/contributions', getUsersContributions);
-router.get('/users/contracts', getAdressesContracts);
-router.get('/users/activity', getUsersActivity);
+router.post('/users/contributions', getUsersContributions);
+router.post('/users/contracts', getAdressesContracts);
+router.post('/users/activity', getUsersActivity);
 
 export default router;
