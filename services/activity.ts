@@ -2,9 +2,11 @@ import { neonDb } from "./neon";
 import { MergeData } from "../types/merge";
 import GithubMetrics from "./github";
 import ContractsService from "./chain";
+import GithubProvider from "./providers/github";
+import { ChainProvider } from "./providers/chain";
 
-const githubMetrics = new GithubMetrics();
-const chainData = new ContractsService();
+const githubMetrics = new GithubMetrics(new GithubProvider());
+const chainData = new ContractsService(new ChainProvider());
 
 export default class Activity {
   constructor() {}
