@@ -61,6 +61,8 @@ export default class GithubMetrics {
     settled.forEach((userEvents) => {
       if (userEvents.status == "fulfilled") {
         events.push(...userEvents.value);
+      } else {
+        console.error("Error fetching user events:", userEvents.reason);
       }
     });
     const projectsRepos = await neonDb.query<ProjectRepository & Project>(

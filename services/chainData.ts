@@ -21,11 +21,8 @@ export default class ContractsService {
     );
     const newContractsWithIds = await this.insertNewContracts(newContracts);
     accounts.forEach((account) => {
-      data[account] = [
-        ...newContractsWithIds,
-        ...dbContracts
-      ];
-    })
+      data[account] = [...newContractsWithIds, ...dbContracts];
+    });
     return data;
   }
   private async fetchContracts(accounts: string[]) {
@@ -54,6 +51,8 @@ export default class ContractsService {
     contractsResults.forEach((result) => {
       if (result.status === "fulfilled") {
         fullFilledContractsResults.push(...result.value.contracts);
+      } else {
+        console.error("Error fetching contracts:", result.reason);
       }
     });
     const contractsDetailsPromises = fullFilledContractsResults.map(
@@ -80,6 +79,8 @@ export default class ContractsService {
             deployerAddress: c.value.nativeTransaction.from.address,
             timestamp: c.value.nativeTransaction.blockTimestamp,
           });
+        } else {
+          console.error("Error fetching contract details:", c.reason)
         }
       });
     }
