@@ -1,7 +1,7 @@
 import { neonDb } from "./neon";
 import { MergeData } from "../types/merge";
-import GithubMetrics from "./githubMetrics";
-import ContractsService from "./chainData";
+import GithubMetrics from "./github";
+import ContractsService from "./chain";
 
 const githubMetrics = new GithubMetrics();
 const chainData = new ContractsService();

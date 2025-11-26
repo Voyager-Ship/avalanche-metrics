@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import GithubMetrics from '../services/githubMetrics';
+import GithubMetrics from '../services/github';
+import GithubProvider from '../services/providers/github';
 
-const githubMetrics = new GithubMetrics();
+const githubMetrics = new GithubMetrics(new GithubProvider());
 
 export const getUsersContributions = async (req: Request, res: Response) => {
   const { users, projects } = req.body;

@@ -1,13 +1,11 @@
-import axios from "axios";
 import { ContributionsData, Event, ProjectRepository } from "../types/github";
-import { createRateLimiter } from "../utils/resilienceMethods";
 import { User } from "../types/user";
 import { Project } from "../types/project";
+import { IGithubProvider } from "../interfaces/providers/github";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
-  private limiter = createRateLimiter(100);
-  constructor() {}
+  constructor(private githubProvider: IGithubProvider) {}
 
   public async getContributionsByUsersAndProjects(
     githubUsersNames: string[],
@@ -15,7 +13,7 @@ export default class GithubMetrics {
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
 
-    const { repos, events, users } = await this.getContributionsData(
+    const { repos, events, users } = await this.githubProvider.getContributions(
       githubUsersNames,
       reposNames
     );
@@ -40,60 +38,6 @@ export default class GithubMetrics {
     return data;
   }
 
-  private async getContributionsData(
-    githubUsersNames: string[],
-    projectsNames: string[]
-  ): Promise<{
-    repos: (ProjectRepository & Project)[];
-    events: Event[];
-    users: User[];
-  }> {
-    const usersEventsPromises = githubUsersNames.map((user) =>
-      this.limiter(async () => {
-        const res = await axios.get<Event[]>(
-          `https://api.github.com/users/${user}/events`
-        );
-        return res.data;
-      })
-    );
-    const settled = await Promise.allSettled(usersEventsPromises);
-    const events: Event[] = [];
-    settled.forEach((userEvents) => {
-      if (userEvents.status == "fulfilled") {
-        events.push(...userEvents.value);
-      } else {
-        console.error("Error fetching user events:", userEvents.reason);
-      }
-    });
-    const projectsRepos = await neonDb.query<ProjectRepository & Project>(
-      `
-  SELECT r.*, p.github_repository AS repo_name,  p.project_name, p.id AS project_id
-  FROM "Project" p
-  LEFT JOIN "ProjectRepository" pr ON pr.project_id = p.id
-  LEFT JOIN "Repository" r ON pr.repository_id = r.id
-  WHERE p.project_name = ANY($1)
-  `,
-      [projectsNames]
-    );
-
-    const users = await neonDb.query<User>(
-      'SELECT * FROM "User" WHERE github_user_name = ANY($1)',
-      [githubUsersNames]
-    );
-    return {
-      events: events,
-      repos: projectsRepos.map((pr) => ({
-        ...pr,
-        last_contribution: pr.last_contribution
-          ? Number(pr.last_contribution)
-          : 0,
-        first_contribution: pr.first_contribution
-          ? Number(pr.first_contribution)
-          : 0,
-      })),
-      users: users,
-    };
-  }
   private async insertNewRepos(
     repos: (ProjectRepository & Project)[],
     events: Event[],

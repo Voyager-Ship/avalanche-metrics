@@ -1,31 +1,14 @@
+import { IChainProvider } from "../../interfaces/providers/chain";
 import axios from "axios";
-import { ChainData as ChainDataType, ContractInfo } from "../types/chain";
-import { neonDb } from "./neon";
-import { createRateLimiter } from "../utils/resilienceMethods";
+import { ContractInfo } from "../../types/chain";
+import { createRateLimiter } from "../../utils/resilienceMethods";
+import { neonDb } from "../neon";
 
-export default class ContractsService {
-  private limiter = createRateLimiter(100);
+export class ChainProvider implements IChainProvider {
+  private limiter = createRateLimiter(1000);
   constructor() {}
 
-  public async getContractsByAddresses(
-    accounts: string[]
-  ): Promise<ChainDataType> {
-    let data: ChainDataType = {};
-
-    const { dbContracts, apiContracts } = await this.fetchContracts(accounts);
-    const newContracts = apiContracts.filter(
-      (apiContract) =>
-        !dbContracts.some(
-          (dbContract) => dbContract.address === apiContract.address
-        )
-    );
-    const newContractsWithIds = await this.insertNewContracts(newContracts);
-    accounts.forEach((account) => {
-      data[account] = [...newContractsWithIds, ...dbContracts];
-    });
-    return data;
-  }
-  private async fetchContracts(accounts: string[]) {
+  public async getContracts(accounts: string[]) {
     const dbContracts = await neonDb.query<ContractInfo>(
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',
       [accounts]
@@ -80,41 +63,10 @@ export default class ContractsService {
             timestamp: c.value.nativeTransaction.blockTimestamp,
           });
         } else {
-          console.error("Error fetching contract details:", c.reason)
+          console.error("Error fetching contract details:", c.reason);
         }
       });
     }
     return { dbContracts, apiContracts };
-  }
-
-  private async insertNewContracts(newContracts: ContractInfo[]) {
-    const results = await neonDb.query(
-      `
-    INSERT INTO "Contract" (
-      address, 
-      deployer_address, 
-      timestamp
-    )
-    SELECT * FROM UNNEST (
-      $1::text[], 
-      $2::text[], 
-      $3::bigint[]
-    )
-    RETURNING id;
-    `,
-      [
-        newContracts.map((r) => String(r.address)),
-        newContracts.map((r) => r.deployerAddress),
-        newContracts.map((r) => String(r.timestamp)),
-      ]
-    );
-
-    if (results.length !== newContracts.length) {
-      throw new Error("Mismatch in inserted contracts length");
-    }
-    return newContracts.map((contract, index) => ({
-      id: results[index].id,
-      ...contract,
-    }));
   }
 }

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import ContractsService from '../services/chainData';
+import ContractsService from '../services/chain';
+import { ChainProvider } from '../services/providers/chain';
 
-const contractsService = new ContractsService();
+const contractsService = new ContractsService(new ChainProvider());
 
 export const getAdressesContracts = async (req: Request, res: Response) => {
   const { accounts } = req.body;
