@@ -53,7 +53,7 @@ export default class Activity {
     dbUsers.forEach((user) => {
       data[user.github_user_name] = {
         contributionsData: contributions[user.github_user_name],
-        chainData: contracts[user.address]?.contracts ?? [],
+        chainData: contracts[user.address] ?? [],
         badgesData: badges
           .filter((badge) => badge.user_id == user.id)
           .map((badge) => ({

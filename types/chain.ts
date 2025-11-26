@@ -1,8 +1,4 @@
-export type ChainData = { [key: string]: ChainDataResponse };
-
-type ChainDataResponse = {
-  contracts: ContractInfo[]
-}
+export type ChainData = { [key: string]: ContractInfo[]};
 
 export type ContractInfo = {
   address: string;

@@ -6,7 +6,7 @@ import { Project } from "../types/project";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
-  private limiter = createRateLimiter(3);
+  private limiter = createRateLimiter(100);
   constructor() {}
 
   public async getContributionsByUsersAndProjects(

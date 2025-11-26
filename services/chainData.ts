@@ -1,89 +1,119 @@
 import axios from "axios";
 import { ChainData as ChainDataType, ContractInfo } from "../types/chain";
 import { neonDb } from "./neon";
+import { createRateLimiter } from "../utils/resilienceMethods";
 
 export default class ContractsService {
+  private limiter = createRateLimiter(100);
   constructor() {}
 
-  public async getContractsByAddresses(accounts: string[]): Promise<ChainDataType> {
-    console.log("Accounts: ", accounts)
+  public async getContractsByAddresses(
+    accounts: string[]
+  ): Promise<ChainDataType> {
     let data: ChainDataType = {};
-    const currentContracts = await neonDb.query(
+
+    const { dbContracts, apiContracts } = await this.fetchContracts(accounts);
+    const newContracts = apiContracts.filter(
+      (apiContract) =>
+        !dbContracts.some(
+          (dbContract) => dbContract.address === apiContract.address
+        )
+    );
+    const newContractsWithIds = await this.insertNewContracts(newContracts);
+    accounts.forEach((account) => {
+      data[account] = [
+        ...newContractsWithIds,
+        ...dbContracts
+      ];
+    })
+    return data;
+  }
+  private async fetchContracts(accounts: string[]) {
+    const dbContracts = await neonDb.query<ContractInfo>(
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',
       [accounts]
     );
-    const contractsPromises = accounts.filter((account) => !!account).map(
-      async (account) =>
-        (
-          await axios.get<any>(
-            `https://data-api.avax.network/v1/chains/43114/contracts/${account}/deployments`
-          )
-        ).data
-    );
-    //Fill contract data
-    const settledContracts = await Promise.allSettled(contractsPromises);
-    for (let i = 0; i < accounts.length; i++) {
-      const account = accounts[i];
-      const result = settledContracts[i];
-      if (result && result.status === "fulfilled") {
-        const newContracts = result.value.contracts.filter(
-          (contract: ContractInfo) =>
-            contract.address &&
-            !currentContracts.some((cc: any) => cc.address === contract.address)
-        );
-        const contractsDetailsPromises = newContracts.map(
-          async (contract: any) =>
+
+    const apiContracts: ContractInfo[] = [];
+
+    const contractsPromises = accounts
+      .filter((account) => !!account)
+      .map(async (account) =>
+        this.limiter(
+          async () =>
+            (
+              await axios.get<{ contracts: any[] }>(
+                `https://data-api.avax.network/v1/chains/43114/contracts/${account}/deployments`
+              )
+            ).data
+        )
+      );
+    const contractsResults = await Promise.allSettled(contractsPromises);
+    const fullFilledContractsResults: any[] = [];
+
+    contractsResults.forEach((result) => {
+      if (result.status === "fulfilled") {
+        fullFilledContractsResults.push(...result.value.contracts);
+      }
+    });
+    const contractsDetailsPromises = fullFilledContractsResults.map(
+      async (contract: any) =>
+        this.limiter(
+          async () =>
             (
               await axios.get<any>(
                 `https://data-api.avax.network/v1/chains/43114/contracts/${contract.address}/transactions:getDeployment`
               )
             ).data
-        );
-        const settledContractsDetails = await Promise.allSettled(
-          contractsDetailsPromises
-        );
-        for (let j = 0; j < newContracts.length; j++) {
-          const contract = newContracts[j];
-          const detailResult = settledContractsDetails[j];
-          if (detailResult.status === "fulfilled") {
-            if (!data[account]) data[account] = { contracts: [] };
-            data[account].contracts.push({
-              address: contract.address,
-              deployerAddress: contract.deploymentDetails.deployerAddress,
-              timestamp: detailResult.value.nativeTransaction.blockTimestamp,
-            });
-            await neonDb.query(
-              'INSERT INTO "Contract" (address, deployer_address, timestamp) VALUES ($1, $2, $3)',
-              [
-                contract.address,
-                contract.deploymentDetails.deployerAddress,
-                detailResult.value.nativeTransaction.blockTimestamp,
-              ]
-            );
-          } else {
-            console.warn(
-              `Failed to fetch deployment details for contract ${contract.address} of account ${account}:`,
-              detailResult.reason
-            );
-          }
+        )
+    );
+    const contractsDetailsResults = await Promise.allSettled(
+      contractsDetailsPromises
+    );
+    if (contractsDetailsResults.length !== fullFilledContractsResults.length) {
+      throw new Error("Mismatch in contracts details results length");
+    } else {
+      contractsDetailsResults.forEach((c, index) => {
+        if (c.status === "fulfilled") {
+          apiContracts.push({
+            address: fullFilledContractsResults[index].address,
+            deployerAddress: c.value.nativeTransaction.from.address,
+            timestamp: c.value.nativeTransaction.blockTimestamp,
+          });
         }
-        if (!data[account]) {
-          data[account] = { contracts: [] };
-        }
-        data[account].contracts = [
-          ...currentContracts.filter(
-            (cc: any) => cc.deployer_address === account
-          ),
-          ...data[account]?.contracts,
-        ];
-      } else {
-        console.warn(
-          `Failed to fetch contracts for account ${account}:`,
-          result?.reason ?? ''
-        );
-      }
+      });
     }
+    return { dbContracts, apiContracts };
+  }
 
-    return data;
+  private async insertNewContracts(newContracts: ContractInfo[]) {
+    const results = await neonDb.query(
+      `
+    INSERT INTO "Contract" (
+      address, 
+      deployer_address, 
+      timestamp
+    )
+    SELECT * FROM UNNEST (
+      $1::text[], 
+      $2::text[], 
+      $3::bigint[]
+    )
+    RETURNING id;
+    `,
+      [
+        newContracts.map((r) => String(r.address)),
+        newContracts.map((r) => r.deployerAddress),
+        newContracts.map((r) => String(r.timestamp)),
+      ]
+    );
+
+    if (results.length !== newContracts.length) {
+      throw new Error("Mismatch in inserted contracts length");
+    }
+    return newContracts.map((contract, index) => ({
+      id: results[index].id,
+      ...contract,
+    }));
   }
 }
