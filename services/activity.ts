@@ -47,11 +47,12 @@ export default class Activity {
         dbUsers.map((user) => user.github_user_name),
         projects
       );
-    const contracts = await chainData.getContractsByAddresses(
-      dbUsers
-        .filter((dbUsers) => dbUsers.address != null)
-        .map((user) => user.address)
-    );
+    // const contracts = await chainData.getContractsByAddresses(
+    //   dbUsers
+    //     .filter((dbUsers) => dbUsers.address != null)
+    //     .map((user) => user.address)
+    // );
+    const contracts: any = [];
     dbUsers.forEach((user) => {
       data[user.github_user_name] = {
         contributionsData: contributions[user.github_user_name],

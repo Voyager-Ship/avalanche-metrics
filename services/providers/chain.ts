@@ -8,7 +8,7 @@ export class ChainProvider implements IChainProvider {
   private limiter = createRateLimiter(1000);
   constructor() {}
 
-  public async getContracts(accounts: string[]) {
+  public async getContracts(chainId: string, accounts: string[]) {
     const dbContracts = await neonDb.query<ContractInfo>(
       'SELECT * FROM "Contract" WHERE deployer_address = ANY($1)',
       [accounts]
@@ -23,7 +23,7 @@ export class ChainProvider implements IChainProvider {
           async () =>
             (
               await axios.get<{ contracts: any[] }>(
-                `https://data-api.avax.network/v1/chains/43114/contracts/${account}/deployments`
+                `https://data-api.avax.network/v1/chains/${chainId}/contracts/${account}/deployments`
               )
             ).data
         )

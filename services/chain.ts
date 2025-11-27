@@ -6,11 +6,12 @@ export default class ContractsService {
   constructor(private chainProvider: IChainProvider) {}
 
   public async getContractsByAddresses(
+    chainId: string,
     accounts: string[]
   ): Promise<ChainDataType> {
     let data: ChainDataType = {};
 
-    const { dbContracts, apiContracts } = await this.chainProvider.getContracts(accounts);
+    const { dbContracts, apiContracts } = await this.chainProvider.getContracts(chainId, accounts);
     const newContracts = apiContracts.filter(
       (apiContract) =>
         !dbContracts.some(
