@@ -17,13 +17,13 @@ export const getAdressesContracts = async (req: Request, res: Response) => {
     return res
       .status(400)
       .json({
-        error: "chainId field is required and must be an string",
+        error: "chainId field is required and must be an integer",
       });
   }
 
   try {
-    const events = await contractsService.getContractsByAddresses(chainId, addresses);
-    return res.json(events);
+    const contracts = await contractsService.getContractsByAddresses(chainId, addresses);
+    return res.json(contracts);
   } catch (err) {
     return res.status(500).json({
       error: "failed to fetch contracts",
