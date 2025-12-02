@@ -6,7 +6,7 @@ import axios from "axios";
 import { neonDb } from "../neon";
 import { IGithubProvider } from "../../interfaces/providers/github";
 
-export default class GithubProvider implements IGithubProvider{
+export default class GithubProvider implements IGithubProvider {
   private limiter = createRateLimiter(1000);
 
   constructor() {}
@@ -64,5 +64,43 @@ export default class GithubProvider implements IGithubProvider{
       })),
       users: users,
     };
+  }
+
+  public async fetchUsersFromDb(): Promise<User[]> {
+    const users = await neonDb.query<User>('SELECT * FROM "User"');
+    return users;
+  }
+  public async fetchUsersFromProjectsFromDb(
+    projects: string[]
+  ): Promise<User[]> {
+    const users = await neonDb.query<User>(
+      `SELECT "User".* 
+      FROM "Project" 
+      JOIN "ProjectRepository" ON "Project".id = "ProjectRepository".project_id
+      JOIN "Repository" ON "ProjectRepository".repository_id = "Repository".id 
+      JOIN "User" ON "Repository".user_id = "User".id 
+      WHERE "Project".project_name = ANY($1)`,
+      [projects]
+    );
+    return users;
+  }
+
+  public async fetchProjectsFromDb(): Promise<Project[]> {
+    const projects = await neonDb.query<Project>('SELECT * FROM "Project"');
+    return projects;
+  }
+  public async fetchProjectsFromUsersFromDb(
+    users: string[]
+  ): Promise<Project[]> {
+    const projects = await neonDb.query<Project>(
+      `SELECT "Project".* 
+      FROM "User" 
+      JOIN "Repository" ON "User".id = "Repository".user_id
+      JOIN "ProjectRepository" ON "Repository".id = "ProjectRepository".repository_id
+      JOIN "Project" ON "ProjectRepository".project_id = "Project".id 
+      WHERE "User".github_user_name = ANY($1)`,
+      [users]
+    );
+    return projects;
   }
 }
