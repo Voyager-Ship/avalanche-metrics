@@ -4,21 +4,27 @@ import GithubMetrics from "./github";
 import ContractsService from "./chain";
 import GithubProvider from "./providers/github";
 import { ChainProvider } from "./providers/chain";
+import { ParamsService } from "./infrastructure/params";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
 const chainData = new ContractsService(new ChainProvider());
 
 export default class Activity {
-  constructor() {}
+  private paramsService: ParamsService;
+  constructor() {
+    this.paramsService = new ParamsService(new GithubProvider());
+  }
   public async getUsersActivity(users: string[], projects: string[]) {
     const data: MergeData = {};
+    const { githubUsersNames, projectsNames } =
+      await this.paramsService.fillParams(users, projects);
     const usersBadgesData = await neonDb.query<any>(
       `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.evidence, ub.awarded_at
    FROM "User" u
    LEFT JOIN "UserBadge" ub ON u.id = ub.user_id
    LEFT JOIN "Badge" b ON ub.badge_id = b.id
    WHERE u.github_user_name = ANY($1)`,
-      [users]
+      [githubUsersNames]
     );
 
     const dbUsers = usersBadgesData.map((row) => ({
@@ -45,7 +51,7 @@ export default class Activity {
     const contributions =
       await githubMetrics.getContributionsByUsersAndProjects(
         dbUsers.map((user) => user.github_user_name),
-        projects
+        projectsNames
       );
     const mainnetContracts = await chainData.getContractsByAddresses(
       43114,
@@ -62,7 +68,10 @@ export default class Activity {
     dbUsers.forEach((user) => {
       data[user.github_user_name] = {
         contributionsData: contributions[user.github_user_name],
-        chainData: [...mainnetContracts[user.address!] ?? [], ...testnetContracts[user.address!] ?? []],
+        chainData: [
+          ...(mainnetContracts[user.address!] ?? []),
+          ...(testnetContracts[user.address!] ?? []),
+        ],
         badgesData: badges
           .filter((badge) => badge.user_id == user.id)
           .map((badge) => ({
