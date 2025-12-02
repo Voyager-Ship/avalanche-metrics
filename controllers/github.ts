@@ -1,27 +1,45 @@
-import { Request, Response } from 'express';
-import GithubMetrics from '../services/github';
-import GithubProvider from '../services/providers/github';
+import { Request, Response } from "express";
+import GithubMetrics from "../services/github";
+import GithubProvider from "../services/providers/github";
+import MockGithubProvider from "../services/providers/test/github";
+import { TEST_MODE } from "../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
+const mockGithubMetrics = new GithubMetrics(new MockGithubProvider());
 
 export const getUsersContributions = async (req: Request, res: Response) => {
   const { users, projects } = req.body;
 
   if (!users || !Array.isArray(users)) {
-    return res.status(400).json({ error: 'users field is required and must be an array' });
+    return res
+      .status(400)
+      .json({ error: "users field is required and must be an array" });
   }
 
   if (!projects || !Array.isArray(projects)) {
-    return res.status(400).json({ error: 'projects field is required and must be an array' });
+    return res
+      .status(400)
+      .json({ error: "projects field is required and must be an array" });
   }
 
   try {
-    const events = await githubMetrics.getContributionsByUsersAndProjects(users, projects);
-    return res.json(events);
+    if (TEST_MODE) {
+      const events = await mockGithubMetrics.getContributionsByUsersAndProjects(
+        users,
+        projects
+      );
+      return res.json(events);
+    } else {
+      const events = await githubMetrics.getContributionsByUsersAndProjects(
+        users,
+        projects
+      );
+      return res.json(events);
+    }
   } catch (err) {
     return res.status(500).json({
-      error: 'failed to fetch contributions',
-      details: String(err)
+      error: "failed to fetch contributions",
+      details: String(err),
     });
   }
 };
