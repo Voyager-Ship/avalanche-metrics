@@ -2,10 +2,15 @@ import { ContributionsData, Event, ProjectRepository } from "../types/github";
 import { User } from "../types/user";
 import { Project } from "../types/project";
 import { IGithubProvider } from "../interfaces/providers/github";
+import { ParamsService } from "./infrastructure/params";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {
-  constructor(private githubProvider: IGithubProvider) {}
+  private paramsService: ParamsService;
+
+  constructor(private githubProvider: IGithubProvider) {
+    this.paramsService = new ParamsService(githubProvider);
+  }
 
   public async getContributionsByUsersAndProjects(
     githubUsersNames: string[],
@@ -13,86 +18,34 @@ export default class GithubMetrics {
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
 
-    if (githubUsersNames.length === 0 && projectsNames.length === 0) {
-      const dbUsers = await this.githubProvider.fetchUsersFromDb();
-      const dbProjects = await this.githubProvider.fetchProjectsFromDb();
-      const dbGithubUsersNames: string[] = [];
-      const dbProjectsNames: string[] = [];
+    const {
+      githubUsersNames: safeGithubUsersNames,
+      projectsNames: safeProjectsNames,
+    } = await this.paramsService.fillParams(githubUsersNames, projectsNames);
 
-      for (let i = 0; i < Math.max(dbUsers.length, dbProjects.length); i++) {
-        if (i < dbUsers.length && dbUsers[i].github_user_name) {
-          dbGithubUsersNames.push(dbUsers[i].github_user_name);
-        }
-        if (i < dbProjects.length && dbProjects[i].project_name) {
-          dbProjectsNames.push(dbProjects[i].project_name);
-        }
-      }
-      if (dbGithubUsersNames.length === 0 && dbProjectsNames.length === 0) {
-        return data;
+    const { repos, events, users } = await this.githubProvider.getContributions(
+      safeGithubUsersNames,
+      safeProjectsNames
+    );
+
+    let newRepos = repos.filter((repo) => repo.repo_id == null);
+    newRepos = await this.insertNewRepos(newRepos, events, users);
+
+    let currentRepos = repos.filter((repo) => repo.repo_id != null);
+    await this.updateCurrentRepos(currentRepos, events, users);
+
+    safeGithubUsersNames.forEach((userName) => {
+      const user = users.find((u) => u.github_user_name == userName);
+      if (user) {
+        data[user.github_user_name] = [
+          ...newRepos.filter((repo) => repo.user_id == user.id),
+          ...currentRepos.filter((repo) => repo.user_id == user.id),
+        ];
       } else {
-        return this.getContributionsByUsersAndProjects(
-          dbGithubUsersNames,
-          dbProjectsNames
-        );
+        data[userName] = [];
       }
-    } else if (githubUsersNames.length === 0) {
-      const dbUsers = await this.githubProvider.fetchUsersFromProjectsFromDb(projectsNames)
-      const dbGithubUsersNames: string[] = [];
-      dbUsers.forEach((user) => {
-        if (user.github_user_name) {
-          dbGithubUsersNames.push(user.github_user_name);
-        }
-      });
-      if (dbGithubUsersNames.length === 0) {
-        return data;
-      } else {
-        return this.getContributionsByUsersAndProjects(
-          dbGithubUsersNames,
-          projectsNames
-        );
-      }
-    } else if (projectsNames.length === 0) {
-      const dbProjects = await this.githubProvider.fetchProjectsFromDb();
-      const dbProjectsNames: string[] = [];
-      dbProjects.forEach((project) => {
-        if (project.project_name) {
-          dbProjectsNames.push(project.project_name);
-        }
-      });
-      if (dbProjectsNames.length === 0) {
-        return data;
-      } else {
-        return this.getContributionsByUsersAndProjects(
-          githubUsersNames,
-          dbProjectsNames
-        );
-      }
-    } else {
-      const { repos, events, users } =
-        await this.githubProvider.getContributions(
-          githubUsersNames,
-          projectsNames
-        );
-
-      let newRepos = repos.filter((repo) => repo.repo_id == null);
-      newRepos = await this.insertNewRepos(newRepos, events, users);
-
-      let currentRepos = repos.filter((repo) => repo.repo_id != null);
-      await this.updateCurrentRepos(currentRepos, events, users);
-
-      githubUsersNames.forEach((userName) => {
-        const user = users.find((u) => u.github_user_name == userName);
-        if (user) {
-          data[user.github_user_name] = [
-            ...newRepos.filter((repo) => repo.user_id == user.id),
-            ...currentRepos.filter((repo) => repo.user_id == user.id),
-          ];
-        } else {
-          data[userName] = [];
-        }
-      });
-      return data;
-    }
+    });
+    return data;
   }
 
   private async insertNewRepos(
