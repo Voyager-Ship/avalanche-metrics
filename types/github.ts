@@ -73,7 +73,7 @@ export interface ProjectRepository {
   id: string;
   last_contribution: number;     // DATE → normalmente string (YYYY-MM-DD)
   first_contribution: number;    // TEXT
-  repo_id: number;
+  repo_id: number | null;
   repo_name: string;
   user_id: string;
   commits: number

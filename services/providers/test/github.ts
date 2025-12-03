@@ -1,14 +1,13 @@
 import { Event, ProjectRepository } from "../../../types/github";
-import { createRateLimiter } from "../../../utils/resilienceMethods";
 import { User } from "../../../types/user";
 import { Project } from "../../../types/project";
-import { neonDb } from "../../neon";
 import { IGithubProvider } from "../../../interfaces/providers/github";
 
-export default class GithubProvider implements IGithubProvider {
-  private limiter = createRateLimiter(1000);
-
-  constructor() {}
+export default class MockedGithubProvider implements IGithubProvider {
+  private records: number;
+  constructor(records: number) {
+    this.records = records;
+  }
 
   public async getContributions(
     githubUsersNames: string[],
@@ -18,20 +17,18 @@ export default class GithubProvider implements IGithubProvider {
     events: Event[];
     users: User[];
   }> {
-    const usersEventsPromises = await this.getMockedEvents(
+    const events = await this.getMockedEvents(
       githubUsersNames,
       projectsNames
     );
-    const events: Event[] = [];
-    usersEventsPromises.forEach((userEvents) => {
-      events.push(userEvents);
-    });
-    const projectsRepos = await this.getMockedProjectRepos();
+    console.log(`Generated ${events.length} mocked events.`);
 
-    const users = await neonDb.query<User>(
-      'SELECT * FROM "User" WHERE github_user_name = ANY($1)',
-      [githubUsersNames]
-    );
+    const projectsRepos = await this.getMockedProjectRepos();
+    console.log(`Generated ${projectsRepos.length} mocked project repos.`);
+
+    const users = this.getMockedUsers()
+    console.log(`Generated ${users.length} mocked users.`);
+
     return {
       events: events,
       repos: projectsRepos.map((pr) => ({
@@ -65,16 +62,16 @@ export default class GithubProvider implements IGithubProvider {
     return this.getMockedProjects();
   }
   private getMockedUsers(): User[] {
-    return Array.from({ length: 100_000 }, (_, i) => ({
-      id: (i + 1).toString(),
-      github_user_name: `mockuser${i + 1}`,
+    return Array.from({ length: this.records}, (_, i) => ({
+      id: 'cm9ltu77a0000l404ks3e4yy7',
+      github_user_name: `mockedUser${i + 1}`,
     }));
   }
 
   private getMockedProjects(): Project[] {
-    return Array.from({ length: 20_000 }, (_, i) => ({
+    return Array.from({ length: this.records}, (_, i) => ({
       project_id: (i + 1).toString(),
-      project_name: `mockproject${i + 1}`,
+      project_name: `mockedProject${i + 1}`,
     }));
   }
 
@@ -85,14 +82,14 @@ export default class GithubProvider implements IGithubProvider {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(
-          Array.from({ length: 100_000 }, (_, i) => ({
+          Array.from({ length: this.records}, (_, i) => ({
             id: `event_${i}`,
             type: (i % 2 === 0
               ? "PushEvent"
               : "PullRequestEvent") as Event["type"],
             actor: {
               id: i,
-              login: users[i % users.length],
+              login: users[i],
               display_login: users[i % users.length],
               gravatar_id: "",
               url: `https://api.github.com/users/${users[i % users.length]}`,
@@ -100,7 +97,7 @@ export default class GithubProvider implements IGithubProvider {
             },
             repo: {
               id: i,
-              name: `repo_${i % 50}`,
+              name: `mockedrepo${i}`,
               url: `https://api.github.com/repos/repo_${i % 50}`,
             },
             payload: {
@@ -135,17 +132,17 @@ export default class GithubProvider implements IGithubProvider {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(
-          Array.from({ length: 50_000 }, (_, i) => ({
+          Array.from({ length: this.records}, (_, i) => ({
             id: (i + 1).toString(),
-            repo_id: i + 1, // Changed to number to match ProjectRepository type
-            repo_name: `mockrepo${i + 1}`,
-            project_id: (i % 1000 + 1).toString(),
-            project_name: `mockproject${i % 1000 + 1}`,
-            github_repository: `mockrepo${i + 1}`,
+            repo_id: i % 4 ? i : null,
+            repo_name: `mockedrepo${i + 1}`,
+            project_id: 'jose1',
+            project_name: `mockedProject${i % 1000 + 1}`,
+            github_repository: `mockedRepo${i + 1}`,
             last_contribution: Date.now() - i * 1000,
             first_contribution: Date.now() - (i + 1000) * 1000,
             commits: i % 500,
-            user_id: `user_${i % 100 + 1}`,
+            user_id: 'cm9ltu77a0000l404ks3e4yy7',
           }))
         );
       }, 3000); // Simulate a 3-second delay

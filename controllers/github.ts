@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import GithubMetrics from "../services/github";
 import GithubProvider from "../services/providers/github";
-import MockGithubProvider from "../services/providers/test/github";
+import MockedGithubProvider from "../services/providers/test/github";
 import { TEST_MODE } from "../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
-const mockGithubMetrics = new GithubMetrics(new MockGithubProvider());
+const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(1001));
 
 export const getUsersContributions = async (req: Request, res: Response) => {
   const { users, projects } = req.body;
@@ -24,7 +24,7 @@ export const getUsersContributions = async (req: Request, res: Response) => {
 
   try {
     if (TEST_MODE) {
-      const events = await mockGithubMetrics.getContributionsByUsersAndProjects(
+      const events = await mockedGithubMetrics.getContributionsByUsersAndProjects(
         users,
         projects
       );

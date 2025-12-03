@@ -4,8 +4,8 @@ import { apiKeyAuth } from './middlewares/auth'
 
 const app = express();
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: false, limit: '500mb' }));
 app.use(apiKeyAuth)
 
 // Mount routes
