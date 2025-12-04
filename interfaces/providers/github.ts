@@ -11,8 +11,8 @@ export interface IGithubProvider {
     events: Event[];
     users: User[];
   }>;
-  fetchUsersFromDb(): Promise<User[]>;
-  fetchUsersFromProjectsFromDb(projects: string[]): Promise<User[]>;
+  fetchUsersFromDb(page: number): Promise<User[]>;
+  fetchUsersFromProjectsFromDb(projects: string[], page: number): Promise<User[]>;
   fetchProjectsFromDb(): Promise<Project[]>;
   fetchProjectsFromUsersFromDb(users: string[]): Promise<Project[]>;
 }

@@ -17,17 +17,13 @@ export default class MockedGithubProvider implements IGithubProvider {
     events: Event[];
     users: User[];
   }> {
-    const events = await this.getMockedEvents(
-      githubUsersNames,
-      projectsNames
-    );
-    console.log(`Generated ${events.length} mocked events.`);
-
+    const events = await this.getMockedEvents(githubUsersNames, projectsNames);
+    console.debug("Events generated: ", events.length);
     const projectsRepos = await this.getMockedProjectRepos();
-    console.log(`Generated ${projectsRepos.length} mocked project repos.`);
+    console.debug("Repos generated: ", projectsRepos.length);
 
-    const users = this.getMockedUsers()
-    console.log(`Generated ${users.length} mocked users.`);
+    const users = this.getMockedUsers();
+    console.debug("Users generated: ", users.length);
 
     return {
       events: events,
@@ -62,14 +58,14 @@ export default class MockedGithubProvider implements IGithubProvider {
     return this.getMockedProjects();
   }
   private getMockedUsers(): User[] {
-    return Array.from({ length: this.records}, (_, i) => ({
-      id: 'cm9ltu77a0000l404ks3e4yy7',
+    return Array.from({ length: this.records }, (_, i) => ({
+      id: "cm9ltu77a0000l404ks3e4yy7",
       github_user_name: `mockedUser${i + 1}`,
     }));
   }
 
   private getMockedProjects(): Project[] {
-    return Array.from({ length: this.records}, (_, i) => ({
+    return Array.from({ length: this.records * 0.2 }, (_, i) => ({
       project_id: (i + 1).toString(),
       project_name: `mockedProject${i + 1}`,
     }));
@@ -79,26 +75,29 @@ export default class MockedGithubProvider implements IGithubProvider {
     users: string[],
     projects: string[]
   ): Promise<Event[]> {
+    const activeUsers = users.slice(0, Math.max(1, Math.floor(users.length * 0.4)));
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(
-          Array.from({ length: this.records}, (_, i) => ({
+          Array.from({ length: this.records * 0.4 * 10 }, (_, i) => ({
             id: `event_${i}`,
             type: (i % 2 === 0
               ? "PushEvent"
               : "PullRequestEvent") as Event["type"],
             actor: {
               id: i,
-              login: users[i],
-              display_login: users[i % users.length],
+              login: activeUsers[Math.round(i / 10)],
+              display_login: activeUsers[i % activeUsers.length],
               gravatar_id: "",
-              url: `https://api.github.com/users/${users[i % users.length]}`,
+              url: `https://api.github.com/users/${activeUsers[i % activeUsers.length]}`,
               avatar_url: `https://avatars.githubusercontent.com/u/${i}?v=4`,
             },
             repo: {
               id: i,
-              name: `mockedrepo${i}`,
-              url: `https://api.github.com/repos/repo_${i % 50}`,
+              name: `mockedrepo${Math.round(i / 10)}`,
+              url: `https://api.github.com/repos/repo_${
+                i % (this.records * 0.4)
+              }`,
             },
             payload: {
               push_id: i,
@@ -128,21 +127,23 @@ export default class MockedGithubProvider implements IGithubProvider {
     });
   }
 
-  private async getMockedProjectRepos(): Promise<(ProjectRepository & Project)[]> {
+  private async getMockedProjectRepos(): Promise<
+    (ProjectRepository & Project)[]
+  > {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve(
-          Array.from({ length: this.records}, (_, i) => ({
+          Array.from({ length: this.records * 0.4 }, (_, i) => ({
             id: (i + 1).toString(),
-            repo_id: i % 4 ? i : null,
-            repo_name: `mockedrepo${i + 1}`,
-            project_id: 'jose1',
-            project_name: `mockedProject${i % 1000 + 1}`,
+            repo_id: null,
+            repo_name: `mockedrepo${i}`,
+            project_id: "jose1",
+            project_name: `mockedProject${(i % 1000) + 1}`,
             github_repository: `mockedRepo${i + 1}`,
             last_contribution: Date.now() - i * 1000,
             first_contribution: Date.now() - (i + 1000) * 1000,
             commits: i % 500,
-            user_id: 'cm9ltu77a0000l404ks3e4yy7',
+            user_id: "cm9ltu77a0000l404ks3e4yy7",
           }))
         );
       }, 3000); // Simulate a 3-second delay

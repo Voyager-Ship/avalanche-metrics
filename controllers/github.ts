@@ -5,10 +5,10 @@ import MockedGithubProvider from "../services/providers/test/github";
 import { TEST_MODE } from "../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
-const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(1001));
+const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(1000));
 
 export const getUsersContributions = async (req: Request, res: Response) => {
-  const { users, projects } = req.body;
+  const { users, projects, page = 1 } = req.body;
 
   if (!users || !Array.isArray(users)) {
     return res
@@ -26,13 +26,16 @@ export const getUsersContributions = async (req: Request, res: Response) => {
     if (TEST_MODE) {
       const events = await mockedGithubMetrics.getContributionsByUsersAndProjects(
         users,
-        projects
+        projects,
+        page
       );
+      console.debug("Test mode active: returning mocked data.");
       return res.json(events);
     } else {
       const events = await githubMetrics.getContributionsByUsersAndProjects(
         users,
-        projects
+        projects,
+        page
       );
       return res.json(events);
     }

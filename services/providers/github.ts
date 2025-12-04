@@ -5,6 +5,7 @@ import { Project } from "../../types/project";
 import axios from "axios";
 import { neonDb } from "../neon";
 import { IGithubProvider } from "../../interfaces/providers/github";
+import { MAX_USERS_PER_REQUEST } from "../../constants/constants";
 
 export default class GithubProvider implements IGithubProvider {
   private limiter = createRateLimiter(1000);
@@ -66,12 +67,16 @@ export default class GithubProvider implements IGithubProvider {
     };
   }
 
-  public async fetchUsersFromDb(): Promise<User[]> {
-    const users = await neonDb.query<User>('SELECT * FROM "User"');
+  public async fetchUsersFromDb(page: number): Promise<User[]> {
+    const users = await neonDb.query<User>(
+      `SELECT * FROM "User" LIMIT $1 OFFSET $2;`,
+      [MAX_USERS_PER_REQUEST, this.getOffset(page, MAX_USERS_PER_REQUEST)]
+    );
     return users;
   }
   public async fetchUsersFromProjectsFromDb(
-    projects: string[]
+    projects: string[],
+    page: number
   ): Promise<User[]> {
     const users = await neonDb.query<User>(
       `SELECT "User".* 
@@ -79,8 +84,12 @@ export default class GithubProvider implements IGithubProvider {
       JOIN "ProjectRepository" ON "Project".id = "ProjectRepository".project_id
       JOIN "Repository" ON "ProjectRepository".repository_id = "Repository".id 
       JOIN "User" ON "Repository".user_id = "User".id 
-      WHERE "Project".project_name = ANY($1)`,
-      [projects]
+      WHERE "Project".project_name = ANY($1) LIMIT $2 OFFSET $3;`,
+      [
+        projects,
+        MAX_USERS_PER_REQUEST,
+        this.getOffset(page, MAX_USERS_PER_REQUEST),
+      ]
     );
     return users;
   }
@@ -102,5 +111,8 @@ export default class GithubProvider implements IGithubProvider {
       [users]
     );
     return projects;
+  }
+  private getOffset(page: number, limit: number): number {
+    return (page - 1) * limit;
   }
 }

@@ -4,10 +4,10 @@ import { Project } from "../types/project";
 import { IGithubProvider } from "../interfaces/providers/github";
 import { ParamsService } from "./infrastructure/params";
 import { neonDb } from "./neon";
-import { performance } from "perf_hooks";
 
 export default class GithubMetrics {
   private paramsService: ParamsService;
+  private readonly MAX_USERS_PER_REQUEST = 1000;
 
   constructor(private githubProvider: IGithubProvider) {
     this.paramsService = new ParamsService(githubProvider);
@@ -15,14 +15,19 @@ export default class GithubMetrics {
 
   public async getContributionsByUsersAndProjects(
     githubUsersNames: string[],
-    projectsNames: string[]
+    projectsNames: string[],
+    page: number = 1
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
+
+    // Implement pagination for users
+    const skip = (page - 1) * this.MAX_USERS_PER_REQUEST;
+    const paginatedUsers = githubUsersNames.slice(skip, skip + this.MAX_USERS_PER_REQUEST);
 
     const {
       githubUsersNames: safeGithubUsersNames,
       projectsNames: safeProjectsNames,
-    } = await this.paramsService.fillParams(githubUsersNames, projectsNames);
+    } = await this.paramsService.fillParams(paginatedUsers, projectsNames, page);
 
     const { repos, events, users } = await this.githubProvider.getContributions(
       safeGithubUsersNames,
@@ -30,16 +35,12 @@ export default class GithubMetrics {
     );
 
     let newRepos = repos.filter((repo) => repo.repo_id == null);
+    console.debug(`${newRepos.length} new repos prepared to insert.`);
     newRepos = await this.insertNewRepos(newRepos, events, users);
 
     let currentRepos = repos.filter((repo) => repo.repo_id != null);
     await this.updateCurrentRepos(currentRepos, events, users);
 
-    console.log("Returning data:");
-    const dataStartTime = performance.now();
-    
-    // Create indexed maps for O(1) lookups: user_id -> repos[] and username -> user
-    const mapStartTime = performance.now();
     const newReposMap = new Map<string, (ProjectRepository & Project)[]>();
     newRepos.forEach((repo) => {
       if (!newReposMap.has(repo.user_id)) {
@@ -47,7 +48,7 @@ export default class GithubMetrics {
       }
       newReposMap.get(repo.user_id)!.push(repo);
     });
-    
+
     const currentReposMap = new Map<string, (ProjectRepository & Project)[]>();
     currentRepos.forEach((repo) => {
       if (!currentReposMap.has(repo.user_id)) {
@@ -55,16 +56,13 @@ export default class GithubMetrics {
       }
       currentReposMap.get(repo.user_id)!.push(repo);
     });
-    
+
     // Create user map for O(1) lookups: username -> user
     const userMap = new Map<string, User>();
     users.forEach((user) => {
       userMap.set(user.github_user_name, user);
     });
-    const mapEndTime = performance.now();
-    console.log(`Maps creation took ${(mapEndTime - mapStartTime).toFixed(2)}ms`);
-    
-    const buildingStartTime = performance.now();
+
     safeGithubUsersNames.forEach((userName) => {
       const user = userMap.get(userName);
       if (user) {
@@ -76,12 +74,7 @@ export default class GithubMetrics {
         data[userName] = [];
       }
     });
-    const buildingEndTime = performance.now();
-    console.log(`Data building took ${(buildingEndTime - buildingStartTime).toFixed(2)}ms`);
-    
-    const dataEndTime = performance.now();
-    console.log(`Total returning data execution time: ${(dataEndTime - dataStartTime).toFixed(2)}ms`);
-    
+
     return data;
   }
 
@@ -91,55 +84,60 @@ export default class GithubMetrics {
     users: User[]
   ) {
     const reposToInsert: (ProjectRepository & Project)[] = [];
-    console.debug(`Preparing to insert new repositories...`);
-    
-    // Create indexed event map for O(1) lookups: user_login -> repo_name -> events[]
-    const eventMap = new Map<string, Map<string, Event[]>>();
-    events.forEach((event) => {
-      if (!eventMap.has(event.actor.login)) {
-        eventMap.set(event.actor.login, new Map());
-      }
-      const userEvents = eventMap.get(event.actor.login)!;
-      if (!userEvents.has(event.repo.name)) {
-        userEvents.set(event.repo.name, []);
-      }
-      userEvents.get(event.repo.name)!.push(event);
-    });
-    
-    users.forEach((user) => {
-      console.debug(`Processing user: ${user.github_user_name}`);
-      const userEvents = eventMap.get(user.github_user_name);
-      
-      if (!userEvents) {
-        return;
-      }
-      
-      repos.forEach((repo) => {
-        const reposNames = repo.repo_name.split(",").map((r) => r.trim());
 
-        reposNames.forEach((singleName) => {
-          const cleanRepoName = singleName.replace("https://api.github.com/repos/", "");
-          const repoEvents = userEvents.get(cleanRepoName);
-          
-          if (repoEvents && repoEvents.length > 0) {
-            reposToInsert.push({
-              id: "",
-              repo_id: repoEvents[0].repo.id,
-              user_id: user.id,
-              first_contribution: new Date(
-                repoEvents[repoEvents.length - 1].created_at
-              ).getTime(),
-              last_contribution: new Date(repoEvents[0].created_at).getTime(),
-              commits: repoEvents.length,
-              repo_name: singleName,
-              project_name: repo.project_name,
-              project_id: repo.project_id,
-            });
-          }
+    // Create repo name map for quick lookup: repo_name -> repo object
+    const repoMap = new Map<string, (ProjectRepository & Project)>();
+    repos.forEach((repo) => {
+      const reposNames = repo.repo_name.split(",").map((r) => r.trim());
+      reposNames.forEach((singleName) => {
+        const cleanName = singleName.replace("https://api.github.com/repos/", "");
+        repoMap.set(cleanName, repo);
+      });
+    });
+
+    // Create user map for O(1) lookups
+    const userMap = new Map<string, User>();
+    users.forEach((user) => {
+      userMap.set(user.github_user_name, user);
+    });
+
+    // Group events by user and repo name (only iterate events once)
+    const eventsByUserRepo = new Map<string, Map<string, Event[]>>();
+    events.forEach((event) => {
+      if (!eventsByUserRepo.has(event.actor.login)) {
+        eventsByUserRepo.set(event.actor.login, new Map());
+      }
+      const userMap = eventsByUserRepo.get(event.actor.login)!;
+      if (!userMap.has(event.repo.name)) {
+        userMap.set(event.repo.name, []);
+      }
+      userMap.get(event.repo.name)!.push(event);
+    });
+
+    // Process only user-repo combinations that have events
+    eventsByUserRepo.forEach((repoEvents, userName) => {
+      const user = userMap.get(userName);
+      if (!user) return;
+
+      repoEvents.forEach((events, repoName) => {
+        const repo = repoMap.get(repoName);
+        if (!repo) return;
+
+        reposToInsert.push({
+          id: "",
+          repo_id: events[0].repo.id,
+          user_id: user.id,
+          first_contribution: new Date(
+            events[events.length - 1].created_at
+          ).getTime(),
+          last_contribution: new Date(events[0].created_at).getTime(),
+          commits: events.length,
+          repo_name: repoName,
+          project_name: repo.project_name,
+          project_id: repo.project_id,
         });
       });
     });
-    console.debug(`Prepared ${reposToInsert.length} repositories to insert.`);
 
     const result = await neonDb.query(
       `
@@ -170,7 +168,7 @@ export default class GithubMetrics {
         reposToInsert.map((r) => r.last_contribution),
       ]
     );
-
+    console.debug(`${result.length} repos inserted into the database.`);
     result.forEach((row, i) => {
       reposToInsert[i].id = row.id;
     });
@@ -190,6 +188,7 @@ export default class GithubMetrics {
       ]
     );
 
+    console.debug(`${reposToInsert.length} project repos inserted into the database.`);
     return reposToInsert;
   }
 
@@ -199,7 +198,7 @@ export default class GithubMetrics {
     users: User[]
   ) {
     const reposToUpdate: (ProjectRepository & Project)[] = [];
-    
+
     // Create indexed event map for O(1) lookups: user_login -> repo_name -> events[]
     const eventMap = new Map<string, Map<string, Event[]>>();
     events.forEach((event) => {
@@ -212,24 +211,28 @@ export default class GithubMetrics {
       }
       userEvents.get(event.repo.name)!.push(event);
     });
-    
+
     users.forEach((user) => {
       const userEvents = eventMap.get(user.github_user_name);
-      
+
       if (!userEvents) {
         return;
       }
-      
+
       repos.forEach((repo) => {
         const reposNames = repo.repo_name.split(",").map((r) => r.trim());
 
         reposNames.forEach((singleName) => {
-          const cleanRepoName = singleName.replace("https://api.github.com/repos/", "");
+          const cleanRepoName = singleName.replace(
+            "https://api.github.com/repos/",
+            ""
+          );
           const repoEvents = userEvents.get(cleanRepoName);
-          
+
           if (repoEvents && repoEvents.length > 0) {
             const newReposEvents = repoEvents.filter(
-              (event) => new Date(event.created_at).getTime() > repo.last_contribution
+              (event) =>
+                new Date(event.created_at).getTime() > repo.last_contribution
             );
             if (newReposEvents.length > 0) {
               reposToUpdate.push({
@@ -245,7 +248,6 @@ export default class GithubMetrics {
       });
     });
 
-    const updateStartTime = performance.now();
     await neonDb.query(
       `
     UPDATE "Repository" AS r
@@ -266,7 +268,5 @@ export default class GithubMetrics {
         reposToUpdate.map((r) => r.last_contribution),
       ]
     );
-    const updateEndTime = performance.now();
-    console.log(`Database update took ${(updateEndTime - updateStartTime).toFixed(2)}ms`);
   }
 }

@@ -14,10 +14,10 @@ export default class Activity {
   constructor() {
     this.paramsService = new ParamsService(new GithubProvider());
   }
-  public async getUsersActivity(users: string[], projects: string[]) {
+  public async getUsersActivity(users: string[], projects: string[], page: number = 1): Promise<MergeData> {
     const data: MergeData = {};
     const { githubUsersNames, projectsNames } =
-      await this.paramsService.fillParams(users, projects);
+      await this.paramsService.fillParams(users, projects, page);
     const usersBadgesData = await neonDb.query<any>(
       `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.evidence, ub.awarded_at
    FROM "User" u

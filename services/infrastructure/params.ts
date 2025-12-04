@@ -1,12 +1,12 @@
 import { IGithubProvider } from "../../interfaces/providers/github";
 
 export class ParamsService {
-
   constructor(private githubProvider: IGithubProvider) {}
 
   public async fillParams(
     githubUsersNames: string[],
-    projectsNames: string[]
+    projectsNames: string[],
+    page: number
   ): Promise<{
     githubUsersNames: string[];
     projectsNames: string[];
@@ -16,7 +16,7 @@ export class ParamsService {
       projectsNames,
     };
     if (githubUsersNames.length === 0 && projectsNames.length === 0) {
-      const dbUsers = await this.githubProvider.fetchUsersFromDb();
+      const dbUsers = await this.githubProvider.fetchUsersFromDb(page);
       const dbProjects = await this.githubProvider.fetchProjectsFromDb();
       const dbGithubUsersNames: string[] = [];
       const dbProjectsNames: string[] = [];
@@ -39,7 +39,8 @@ export class ParamsService {
       }
     } else if (githubUsersNames.length === 0) {
       const dbUsers = await this.githubProvider.fetchUsersFromProjectsFromDb(
-        projectsNames
+        projectsNames,
+        page
       );
       const dbGithubUsersNames: string[] = [];
       dbUsers.forEach((user) => {
@@ -68,8 +69,8 @@ export class ParamsService {
       } else {
         return {
           githubUsersNames,
-          projectsNames: dbProjectsNames
-        }
+          projectsNames: dbProjectsNames,
+        };
       }
     } else {
       return params;
