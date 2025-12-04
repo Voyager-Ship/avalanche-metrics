@@ -5,6 +5,7 @@ import ContractsService from "./chain";
 import GithubProvider from "./providers/github";
 import { ChainProvider } from "./providers/chain";
 import { ParamsService } from "./infrastructure/params";
+import { MAX_USERS_PER_REQUEST } from "../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
 const chainData = new ContractsService(new ChainProvider());
@@ -14,17 +15,27 @@ export default class Activity {
   constructor() {
     this.paramsService = new ParamsService(new GithubProvider());
   }
-  public async getUsersActivity(users: string[], projects: string[], page: number = 1): Promise<MergeData> {
+  public async getUsersActivity(
+    users: string[],
+    projects: string[],
+    page: number
+  ): Promise<MergeData> {
     const data: MergeData = {};
     const { githubUsersNames, projectsNames } =
       await this.paramsService.fillParams(users, projects, page);
+    
+    console.debug("Getting user badges for:", githubUsersNames);
     const usersBadgesData = await neonDb.query<any>(
       `SELECT u.*, ub.badge_id, b.id as badge_id, b.name, b.description, b.category, b.points, ub.evidence, ub.awarded_at
    FROM "User" u
    LEFT JOIN "UserBadge" ub ON u.id = ub.user_id
    LEFT JOIN "Badge" b ON ub.badge_id = b.id
-   WHERE u.github_user_name = ANY($1)`,
-      [githubUsersNames]
+   WHERE u.github_user_name = ANY($1) LIMIT $2 OFFSET $3;`,
+      [
+        githubUsersNames,
+        MAX_USERS_PER_REQUEST,
+        (page - 1) * MAX_USERS_PER_REQUEST,
+      ]
     );
 
     const dbUsers = usersBadgesData.map((row) => ({
@@ -48,22 +59,28 @@ export default class Activity {
         })),
       }));
 
+    console.debug("Getting contributions...");
     const contributions =
       await githubMetrics.getContributionsByUsersAndProjects(
         dbUsers.map((user) => user.github_user_name),
-        projectsNames
+        projectsNames,
+        page
       );
+    console.debug("Getting mainnet contracts...");
     const mainnetContracts = await chainData.getContractsByAddresses(
       43114,
       dbUsers
         .filter((dbUsers) => dbUsers.address != null)
-        .map((user) => user.address)
+        .map((user) => user.address),
+      page
     );
+    console.debug("Getting testnet contracts...");
     const testnetContracts = await chainData.getContractsByAddresses(
       43113,
       dbUsers
         .filter((dbUsers) => dbUsers.address != null)
-        .map((user) => user.address)
+        .map((user) => user.address),
+      page
     );
     dbUsers.forEach((user) => {
       data[user.github_user_name] = {

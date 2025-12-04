@@ -2,13 +2,16 @@ import { IChainProvider } from "../../../interfaces/providers/chain";
 import { ContractInfo } from "../../../types/chain";
 
 export class MockedChainProvider implements IChainProvider {
-  constructor() {}
+  private records: number;
+  constructor(records: number) {
+    this.records = records;
+  }
 
   public async getContracts(chainId: number, accounts: string[]) {
     const mockedContracts: ContractInfo[] = [];
 
     accounts.forEach((account, accountIndex) => {
-      for (let i = 0; i < 1000; i++) {
+      for (let i = 0; i < this.records; i++) {
         mockedContracts.push({
           address: `0xMockedAddress${accountIndex}_${i}`,
           deployerAddress: account,
@@ -17,6 +20,6 @@ export class MockedChainProvider implements IChainProvider {
       }
     });
 
-    return { dbContracts: mockedContracts, apiContracts: mockedContracts };
+    return { dbContracts: [], apiContracts: mockedContracts};
   }
 }

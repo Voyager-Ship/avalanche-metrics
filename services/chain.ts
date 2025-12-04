@@ -1,5 +1,6 @@
 import { IChainProvider } from "../interfaces/providers/chain";
 import { ChainData as ChainDataType, ContractInfo } from "../types/chain";
+import { MAX_USERS_PER_REQUEST } from "../constants/constants";
 import { neonDb } from "./neon";
 
 export default class ContractsService {
@@ -7,13 +8,18 @@ export default class ContractsService {
 
   public async getContractsByAddresses(
     chainId: number,
-    accounts: string[]
+    accounts: string[],
+    page: number
   ): Promise<ChainDataType> {
     let data: ChainDataType = {};
+    const paginatedAccounts = accounts.slice(
+      (page - 1) * MAX_USERS_PER_REQUEST,
+      page * MAX_USERS_PER_REQUEST
+    );
 
     const { dbContracts, apiContracts } = await this.chainProvider.getContracts(
       chainId,
-      accounts
+      paginatedAccounts
     );
     const newContracts = apiContracts.filter(
       (apiContract) =>
@@ -21,14 +27,20 @@ export default class ContractsService {
           (dbContract) => dbContract.address === apiContract.address
         )
     );
-    const newContractsWithIds = await this.insertNewContracts(chainId, newContracts);
+    const newContractsWithIds = await this.insertNewContracts(
+      chainId,
+      newContracts
+    );
     accounts.forEach((account) => {
       data[account] = [...newContractsWithIds, ...dbContracts];
     });
     return data;
   }
 
-  private async insertNewContracts(chainId: number, newContracts: ContractInfo[]) {
+  private async insertNewContracts(
+    chainId: number,
+    newContracts: ContractInfo[]
+  ) {
     const results = await neonDb.query(
       `
     INSERT INTO "Contract" (

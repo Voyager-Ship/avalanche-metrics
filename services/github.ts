@@ -16,7 +16,7 @@ export default class GithubMetrics {
   public async getContributionsByUsersAndProjects(
     githubUsersNames: string[],
     projectsNames: string[],
-    page: number = 1
+    page: number
   ): Promise<ContributionsData> {
     const data: ContributionsData = {};
 
