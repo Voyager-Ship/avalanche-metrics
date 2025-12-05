@@ -129,5 +129,71 @@ MASTER_API_KEY="a_long_random_secret_key"
 
 ---
 
-Si quieres, puedo agregarte un ejemplo de archivo `.env.example` para complementar tu README.
+Aquí tienes la **tabla limpia en Markdown** para pegar directo en tu `README.md`, manteniendo exactamente los valores de tu captura.
 
+---
+
+**TEST_MODE**  
+Indica si la aplicación debe ejecutarse en modo de pruebas.  
+Cuando está en `true`, se habilitan comportamientos especiales para testing (datos simulados, desactivación de integraciones externas, logs adicionales, etc.).  
+Cuando está en `false`, la aplicación opera en modo normal de producción.
+
+---
+
+**Endpoints**
+
+# 1) Users contributions
+curl -X POST "https://avalanche-metrics.vercel.app/users/contributions" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $AVALANCHE_METRICS_API_KEY" \
+  -d '{
+    "users": ["user1", "user2"],
+    "projects": ["project1", "project2"],
+    "page": 1
+  }'
+
+---
+
+# 2) Users activity
+curl -X POST "https://avalanche-metrics.vercel.app/users/activity" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $AVALANCHE_METRICS_API_KEY" \
+  -d '{
+    "users": ["user1", "user2"],
+    "projects": ["project1", "project2"],
+    "page": 1
+  }'
+
+---
+
+# 3) Chain contracts data
+curl -X POST "https://avalanche-metrics.vercel.app/users/contracts" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: $AVALANCHE_METRICS_API_KEY" \
+  -d '{
+    "addresses": ["0x0000000000000000000000000000000000000000"],
+    "chainId": 43114,
+    "page": 1
+  }'
+
+
+
+# **Github Endpoint – Performance Tests**
+
+| Users   | Events  | Repositories | Time       | Response Size | Notes                                                                     |
+| ------- | ------- | ------------ | ---------- | ------------- | ------------------------------------------------------------------------- |
+| 1,000   | 4,000   | 400          | 11.8s      | 100MB         |                                                                           |
+| 10,000  | 40,000  | 4,000        | 14s, 41.6s | 100MB         | Data saved on database on 14s, failed convertion to json on 41.6s         |
+| 100,000 | 400,000 | 40,000       | 40s, 44s   | 100MB         | Data saved on database on 40s, failed convertion to json by memory on 44s |
+
+---
+
+# **Chain Endpoint – Performance Tests**
+
+| Accounts | Contracts | Response Size | Time  | Notes |
+| -------- | --------- | ------------- | ----- | ----- |
+| 1,000    | 1,000     | 148.4kb       | 3s    |       |
+| 10,000   | 10,000    | 1497kb        | 4.92s |       |
+| 100,000  | 100,000   | 14MB          | 11s   |       |
+
+---

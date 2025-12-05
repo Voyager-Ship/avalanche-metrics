@@ -5,7 +5,7 @@ import MockedGithubProvider from "../services/providers/test/github";
 import { TEST_MODE } from "../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
-const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(1000));
+const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(100000));
 
 export const getUsersContributions = async (req: Request, res: Response) => {
   const { users, projects, page = 1 } = req.body;

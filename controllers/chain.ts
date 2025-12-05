@@ -5,7 +5,7 @@ import { MockedChainProvider } from "../services/providers/test/chain";
 import { TEST_MODE } from "../constants/constants";
 
 const contractsService = new ContractsService(new ChainProvider());
-const mockedContractsService = new ContractsService(new MockedChainProvider(1000));
+const mockedContractsService = new ContractsService(new MockedChainProvider(100000));
 
 export const getAdressesContracts = async (req: Request, res: Response) => {
   const { addresses, chainId, page = 1 } = req.body;
