@@ -48,27 +48,6 @@ PORT=4000 npm run dev
 PORT=4000 npm start
 ```
 
-## Endpoints
-
-- GET /hello — returns JSON `{ "message": "Hello World" }`
-
-Example:
-
-```bash
-curl http://localhost:3000/hello
-# { "message": "Hello World" }
-```
-
-## Notes
-
-- Dev dependencies were added for TypeScript and runtime tooling (`typescript`, `ts-node-dev`, `@types/*`).
-- After `npm install` you might see audit warnings from transitive dependencies. I can help upgrade or pin safe fixes if you want.
-
-## Next steps (optional)
-- Move source into `src/` and adjust `tsconfig.json`.
-- Add linting (ESLint) and basic unit tests (Jest).
-
-
 ## 🔐 Environment Variables
 
 This project requires several environment variables to be configured in order to interact with external services and the database. Below is a description of each variable and where it comes from.
@@ -140,7 +119,7 @@ Cuando está en `false`, la aplicación opera en modo normal de producción.
 
 ---
 
-**Endpoints**
+### **Endpoints**
 
 # 1) Users contributions
 curl -X POST "https://avalanche-metrics.vercel.app/users/contributions" \
@@ -197,3 +176,14 @@ curl -X POST "https://avalanche-metrics.vercel.app/users/contracts" \
 | 100,000  | 100,000   | 14MB          | 11s   |       |
 
 ---
+
+## Notes
+
+- Dev dependencies were added for TypeScript and runtime tooling (`typescript`, `ts-node-dev`, `@types/*`).
+- After `npm install` you might see audit warnings from transitive dependencies. I can help upgrade or pin safe fixes if you want.
+
+## Next steps (optional)
+- Move source into `src/` and adjust `tsconfig.json`.
+- Add linting (ESLint) and basic unit tests (Jest).
+
+
