@@ -2,7 +2,7 @@ import { IChainProvider } from "../../interfaces/providers/chain";
 import axios from "axios";
 import { ContractInfo } from "../../types/chain";
 import { createRateLimiter } from "../../utils/resilienceMethods";
-import { neonDb } from "../neon";
+import { neonDb } from "../contributions/neon";
 
 export class ChainProvider implements IChainProvider {
   private limiter = createRateLimiter(1000);

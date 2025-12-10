@@ -1,8 +1,8 @@
-import { ContributionsData, Event, ProjectRepository } from "../types/github";
-import { User } from "../types/user";
-import { Project } from "../types/project";
-import { IGithubProvider } from "../interfaces/providers/github";
-import { ParamsService } from "./infrastructure/params";
+import { ContributionsData, Event, ProjectRepository } from "../../types/github";
+import { User } from "../../types/user";
+import { Project } from "../../types/project";
+import { IGithubProvider } from "../../interfaces/providers/github";
+import { ParamsService } from "../infrastructure/params";
 import { neonDb } from "./neon";
 
 export default class GithubMetrics {

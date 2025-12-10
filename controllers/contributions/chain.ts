@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import ContractsService from "../services/chain";
-import { ChainProvider } from "../services/providers/chain";
-import { MockedChainProvider } from "../services/providers/test/chain";
-import { TEST_MODE } from "../constants/constants";
+import ContractsService from "../../services/contributions/chain";
+import { ChainProvider } from "../../services/providers/chain";
+import { MockedChainProvider } from "../../services/providers/test/chain";
+import { TEST_MODE } from "../../constants/constants";
 
 const contractsService = new ContractsService(new ChainProvider());
 const mockedContractsService = new ContractsService(new MockedChainProvider(100000));

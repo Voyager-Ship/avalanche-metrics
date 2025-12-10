@@ -3,7 +3,7 @@ import { createRateLimiter } from "../../utils/resilienceMethods";
 import { User } from "../../types/user";
 import { Project } from "../../types/project";
 import axios from "axios";
-import { neonDb } from "../neon";
+import { neonDb } from "../contributions/neon";
 import { IGithubProvider } from "../../interfaces/providers/github";
 import { MAX_USERS_PER_REQUEST } from "../../constants/constants";
 

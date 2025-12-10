@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import Activity from "../services/activity";
+import Activity from "../../services/contributions/activity";
 
 const merge = new Activity();
 

@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import GithubMetrics from "../services/github";
-import GithubProvider from "../services/providers/github";
-import MockedGithubProvider from "../services/providers/test/github";
-import { TEST_MODE } from "../constants/constants";
+import GithubMetrics from "../../services/contributions/github";
+import GithubProvider from "../../services/providers/github";
+import MockedGithubProvider from "../../services/providers/test/github";
+import { TEST_MODE } from "../../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
 const mockedGithubMetrics = new GithubMetrics(new MockedGithubProvider(100000));

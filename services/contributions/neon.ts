@@ -1,5 +1,5 @@
 import { Pool, PoolConfig, PoolClient, QueryResultRow } from 'pg';
-import { NEON_CONNECTION_STRING } from '../constants/constants'
+import { NEON_CONNECTION_STRING } from '../../constants/constants'
 
 /**
  * NeonDB is a small wrapper around `pg` Pool exposing query helpers.

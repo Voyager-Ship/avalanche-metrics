@@ -1,11 +1,11 @@
 import { neonDb } from "./neon";
-import { MergeData } from "../types/merge";
+import { MergeData } from "../../types/merge";
 import GithubMetrics from "./github";
 import ContractsService from "./chain";
-import GithubProvider from "./providers/github";
-import { ChainProvider } from "./providers/chain";
-import { ParamsService } from "./infrastructure/params";
-import { MAX_USERS_PER_REQUEST } from "../constants/constants";
+import GithubProvider from "../providers/github";
+import { ChainProvider } from "../providers/chain";
+import { ParamsService } from "../infrastructure/params";
+import { MAX_USERS_PER_REQUEST } from "../../constants/constants";
 
 const githubMetrics = new GithubMetrics(new GithubProvider());
 const chainData = new ContractsService(new ChainProvider());
