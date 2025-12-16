@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import GithubMetrics from "../../services/contributions/github";
-import GithubProvider from "../../services/providers/github";
+import GithubProvider from "../../services/providers/contributions/github";
 import MockedGithubProvider from "../../services/providers/test/github";
 import { TEST_MODE } from "../../constants/constants";
 

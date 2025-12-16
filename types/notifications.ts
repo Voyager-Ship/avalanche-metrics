@@ -4,5 +4,8 @@ export interface Notification {
   type: string
   content: string
   content_type: string
+  short_description: string
+  template?: string
+  pending: boolean
   recipients: string[]
 } 

@@ -1,7 +1,7 @@
 import { IChainProvider } from "../../interfaces/providers/chain";
 import { ChainData as ChainDataType, ContractInfo } from "../../types/chain";
 import { MAX_USERS_PER_REQUEST } from "../../constants/constants";
-import { neonDb } from "./neon";
+import { neonDb } from "../infrastructure/neon";
 
 export default class ContractsService {
   constructor(private chainProvider: IChainProvider) {}

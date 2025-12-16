@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import ContractsService from "../../services/contributions/chain";
-import { ChainProvider } from "../../services/providers/chain";
+import { ChainProvider } from "../../services/providers/contributions/chain";
 import { MockedChainProvider } from "../../services/providers/test/chain";
 import { TEST_MODE } from "../../constants/constants";
 

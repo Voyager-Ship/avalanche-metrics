@@ -1,9 +1,9 @@
-import { neonDb } from "./neon";
+import { neonDb } from "../infrastructure/neon";
 import { MergeData } from "../../types/merge";
 import GithubMetrics from "./github";
 import ContractsService from "./chain";
-import GithubProvider from "../providers/github";
-import { ChainProvider } from "../providers/chain";
+import GithubProvider from "../providers/contributions/github";
+import { ChainProvider } from "../providers/contributions/chain";
 import { ParamsService } from "../infrastructure/params";
 import { MAX_USERS_PER_REQUEST } from "../../constants/constants";
 

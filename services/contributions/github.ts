@@ -3,7 +3,7 @@ import { User } from "../../types/user";
 import { Project } from "../../types/project";
 import { IGithubProvider } from "../../interfaces/providers/github";
 import { ParamsService } from "../infrastructure/params";
-import { neonDb } from "./neon";
+import { neonDb } from "../infrastructure/neon";
 
 export default class GithubMetrics {
   private paramsService: ParamsService;
