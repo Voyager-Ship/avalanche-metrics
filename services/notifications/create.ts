@@ -36,7 +36,7 @@ export default class NotificationsCreator {
         notifications.map((r) => r.short_description),
         notifications.map((r) => r.template),
         notifications.map(() => 'pending'),
-        notifications.map((r) => r.audience),
+        notifications.map((r) => r.audience.concat(',')),
       ]
     );
   }
