@@ -1,7 +1,9 @@
 import express from 'express';
 import indexRouter from './routes/index';
 import { apiKeyAuth } from './middlewares/auth'
+import dns from 'node:dns';
 
+dns.setDefaultResultOrder('ipv4first');
 const app = express();
 
 app.use(express.json({ limit: '500mb' }));

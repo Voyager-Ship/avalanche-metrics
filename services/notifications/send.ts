@@ -14,23 +14,31 @@ export default class NotificationsSender {
     const emailNotifications = notifications.filter((n) =>
       n.type.includes("email")
     );
-    const sendedEmailNotifications = this.sendInboxNotifications(emailNotifications)
-    const sendedInboxNotifications = this.sendInboxNotifications(inboxNotifications)
-    const sendedNotifications = [...sendedInboxNotifications, ...sendedEmailNotifications]
+    const sendedEmailNotifications =
+      this.sendEmailNotifications(emailNotifications);
+    const sendedInboxNotifications =
+      this.sendInboxNotifications(inboxNotifications);
+    const sendedNotifications = [
+      ...sendedInboxNotifications,
+      ...sendedEmailNotifications,
+    ];
 
-     if (sendedNotifications.length > 0) {
+    if (sendedNotifications.length > 0) {
       await neonDb.query(
         `
         UPDATE "Notification" AS n
-        SET pending = u.pending
+        SET status = u.status
         FROM (
           SELECT
             UNNEST($1::int[]) AS id,
-            UNNEST($2::boolean[]) AS pending
+            UNNEST($2::text[]) AS status 
         ) AS u
         WHERE n.id = u.id;
         `,
-        [sendedNotifications.map((n) => n.id), sendedNotifications.map((n) => n.pending)]
+        [
+          sendedNotifications.map((n) => n.id),
+          sendedNotifications.map((n) => n.status),
+        ]
       );
     }
     return notifications;
@@ -39,21 +47,21 @@ export default class NotificationsSender {
   private sendEmailNotifications(notifications: Notification[]) {
     const sendedNotifications: Notification[] = [];
     notifications.forEach((n) => {
-      n.pending = false;
-      if (n.pending == false) {
+      n.status = "sent";
+      if (n.status == "sent") {
         sendedNotifications.push(n);
       }
     });
-    return sendedNotifications
+    return sendedNotifications;
   }
   private sendInboxNotifications(notifications: Notification[]) {
     const sendedNotifications: Notification[] = [];
     notifications.forEach((n) => {
-      n.pending = false;
-      if (n.pending == false) {
+      n.status = "sent";
+      if (n.status == "sent") {
         sendedNotifications.push(n);
       }
     });
-    return sendedNotifications
+    return sendedNotifications;
   }
 }

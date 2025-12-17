@@ -6,6 +6,6 @@ export interface Notification {
   content_type: string
   short_description: string
   template?: string
-  pending: boolean
+  status: 'pending'  | 'error' | 'sent'
   recipients: string[]
 } 
