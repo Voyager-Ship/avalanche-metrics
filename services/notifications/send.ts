@@ -1,29 +1,51 @@
 import { NotificationsProvider } from "../providers/notifications/notifications";
-import { Notification } from "../../types/notifications";
+import { DbNotification, InputNotification } from "../../types/notifications";
 import { neonDb } from "../infrastructure/neon";
 
 export default class NotificationsSender {
   private notificationsProvider = new NotificationsProvider();
   constructor() {}
   public async sendNotifications() {
+    // Get data
     const notifications =
       await this.notificationsProvider.fetchPendingNotifications();
-    const inboxNotifications = notifications.filter((n) =>
-      n.type.includes("inbox")
-    );
-    const emailNotifications = notifications.filter((n) =>
-      n.type.includes("email")
-    );
-    const sendedEmailNotifications =
-      this.sendEmailNotifications(emailNotifications);
-    const sendedInboxNotifications =
-      this.sendInboxNotifications(inboxNotifications);
-    const sendedNotifications = [
-      ...sendedInboxNotifications,
-      ...sendedEmailNotifications,
-    ];
+    const users = notifications.flatMap((n) => n.audience);
+    const dbUsers = await this.notificationsProvider.fetchUsers(users);
 
-    if (sendedNotifications.length > 0) {
+    const emailNotificationsToSend: DbNotification[] = [];
+    const inboxNotificationsToSend: DbNotification[] = [];
+    notifications.forEach((n) => {
+      const dbAudience = n.audience
+        .split(",")
+        .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
+      dbAudience.forEach((u) => {
+        if (u) {
+          switch (u.notification_means) {
+            case "email":
+              emailNotificationsToSend.push({ ...n, audience: u.email });
+            case "inbox":
+              inboxNotificationsToSend.push({ ...n, audience: u.id });
+            case "all":
+              emailNotificationsToSend.push({ ...n, audience: u.email });
+              inboxNotificationsToSend.push({ ...n, audience: u.id });
+            default:
+              n.status = "error";
+          }
+          n.status = "sent";
+        } else {
+          n.status = "error";
+        }
+      });
+    });
+
+    const emailNotificationsStatus = this.sendEmailNotifications(
+      emailNotificationsToSend
+    );
+    const inboxNotificationsStatus = this.sendInboxNotifications(
+      inboxNotificationsToSend
+    );
+
+    if (notifications.length > 0) {
       await neonDb.query(
         `
         UPDATE "Notification" AS n
@@ -31,37 +53,43 @@ export default class NotificationsSender {
         FROM (
           SELECT
             UNNEST($1::int[]) AS id,
-            UNNEST($2::text[]) AS status 
+            UNNEST($2::text[]) AS status
         ) AS u
         WHERE n.id = u.id;
         `,
         [
-          sendedNotifications.map((n) => n.id),
-          sendedNotifications.map((n) => n.status),
+          notifications.map((n) => n.id),
+          notifications.map((n) =>
+            n.status == "sent" &&
+            emailNotificationsStatus[n.id] == "sent" &&
+            inboxNotificationsStatus[n.id] == "sent"
+              ? "sent"
+              : "error"
+          ),
         ]
       );
     }
     return notifications;
   }
 
-  private sendEmailNotifications(notifications: Notification[]) {
-    const sendedNotifications: Notification[] = [];
+  private sendEmailNotifications(notifications: DbNotification[]) {
+    const notificationsStatus: { [key: string]: string } = {};
     notifications.forEach((n) => {
       n.status = "sent";
       if (n.status == "sent") {
-        sendedNotifications.push(n);
+        notificationsStatus[n.id] = "sent";
       }
     });
-    return sendedNotifications;
+    return notificationsStatus;
   }
-  private sendInboxNotifications(notifications: Notification[]) {
-    const sendedNotifications: Notification[] = [];
+  private sendInboxNotifications(notifications: DbNotification[]) {
+    const notificationsStatus: { [key: string]: string } = {};
     notifications.forEach((n) => {
       n.status = "sent";
       if (n.status == "sent") {
-        sendedNotifications.push(n);
+        notificationsStatus[n.id] = "sent";
       }
     });
-    return sendedNotifications;
+    return notificationsStatus;
   }
 }

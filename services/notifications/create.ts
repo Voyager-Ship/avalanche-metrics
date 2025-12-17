@@ -1,9 +1,9 @@
-import { Notification } from "../../types/notifications";
+import { InputNotification } from "../../types/notifications";
 import { neonDb } from "../infrastructure/neon";
 
 export default class NotificationsCreator {
   constructor() {}
-  public async createNotifications(notifications: Notification[]) {
+  public async createNotifications(notifications: InputNotification[]) {
     neonDb.query(
       `
     INSERT INTO "Notification" (
@@ -14,7 +14,7 @@ export default class NotificationsCreator {
       short_description,
       template,
       status,
-      recipients
+      audience 
     )
     SELECT * FROM UNNEST (
       $1::text[], 
@@ -36,7 +36,7 @@ export default class NotificationsCreator {
         notifications.map((r) => r.short_description),
         notifications.map((r) => r.template),
         notifications.map(() => 'pending'),
-        notifications.map((r) => r.recipients),
+        notifications.map((r) => r.audience),
       ]
     );
   }
