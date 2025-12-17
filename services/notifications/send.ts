@@ -38,10 +38,10 @@ export default class NotificationsSender {
       });
     });
 
-    const emailNotificationsStatus = this.sendEmailNotifications(
+    const emailNotificationsStatus = await this.sendEmailNotifications(
       emailNotificationsToSend
     );
-    const inboxNotificationsStatus = this.sendInboxNotifications(
+    const inboxNotificationsStatus = await this.sendInboxNotifications(
       inboxNotificationsToSend
     );
 
@@ -72,9 +72,14 @@ export default class NotificationsSender {
     return notifications;
   }
 
-  private sendEmailNotifications(notifications: DbNotification[]) {
+  private async sendEmailNotifications(notifications: DbNotification[]) {
     const notificationsStatus: { [key: string]: string } = {};
+    const templates = notifications.map((n) => n.template ?? "");
+    const dbTemplates = await this.notificationsProvider.fetchTemplates(
+      templates
+    );
     notifications.forEach((n) => {
+      const template = dbTemplates.find((t) => t.id == n.template);
       n.status = "sent";
       if (n.status == "sent") {
         notificationsStatus[n.id] = "sent";
@@ -82,7 +87,7 @@ export default class NotificationsSender {
     });
     return notificationsStatus;
   }
-  private sendInboxNotifications(notifications: DbNotification[]) {
+  private async sendInboxNotifications(notifications: DbNotification[]) {
     const notificationsStatus: { [key: string]: string } = {};
     notifications.forEach((n) => {
       n.status = "sent";
