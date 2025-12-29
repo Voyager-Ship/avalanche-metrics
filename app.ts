@@ -1,10 +1,18 @@
 import express from 'express';
 import indexRouter from './routes/index';
 import { apiKeyAuth } from './middlewares/auth'
+import cors from 'cors';
 import dns from 'node:dns';
 
 dns.setDefaultResultOrder('ipv4first');
 const app = express();
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  })
+);
 
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: false, limit: '500mb' }));
