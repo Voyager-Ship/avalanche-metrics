@@ -1,5 +1,9 @@
 import { NotificationsProvider } from "../providers/notifications/notifications";
-import { DbNotification, InputNotification } from "../../types/notifications";
+import {
+  DbNotification,
+  InputNotification,
+  NotificationInbox,
+} from "../../types/notifications";
 import { neonDb } from "../infrastructure/neon";
 
 export default class NotificationsSender {
@@ -20,6 +24,7 @@ export default class NotificationsSender {
       const dbAudience = n.audience
         .split(",")
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
+      console.log("DB AUDIENCE:", dbAudience);
       dbAudience.forEach((u, i) => {
         if (u) {
           switch (u.notification_means) {
@@ -37,13 +42,16 @@ export default class NotificationsSender {
               n.status = "error";
               n.last_error = `Unknown notification means of user: ${u.id}`;
           }
-          n.status = "sent";
+          if (n.status == "pending") {
+            n.status = "sent";
+          }
         } else {
           n.status = "error";
           n.last_error = `User ${n.audience[i]} not found`;
         }
       });
     });
+    console.log("INBOX NOTIFICATIONS TO SEND:", inboxNotificationsToSend);
 
     const emailNotificationsStatus = await this.sendEmailNotifications(
       emailNotificationsToSend
@@ -106,14 +114,56 @@ export default class NotificationsSender {
     return notificationsStatus;
   }
   private async sendInboxNotifications(notifications: DbNotification[]) {
+    console.debug(`Sending ${notifications.length} inbox notifications:`);
     const notificationsStatus: {
       [key: string]: { status: string; error: string };
     } = {};
-    notifications.forEach((n) => {
+
+    const notificationsToSend: NotificationInbox[] = notifications.map((n) => ({
+      id: 0,
+      audience: n.audience,
+      type: n.type,
+      title: n.title,
+      content: n.content,
+      short_description: n.short_description,
+      status: "sent",
+    }));
+    const res = await neonDb.query<{ id: number }>(
+      `
+    INSERT INTO "NotificationInbox" (
+      type,
+      title,
+      content,
+      short_description,
+      status,
+      audience
+    )
+    SELECT * FROM UNNEST (
+      $1::text[],
+      $2::text[],
+      $3::text[],
+      $4::text[],
+      $5::text[],
+      $6::text[]
+    )
+    RETURNING id;
+    `,
+      [
+        notificationsToSend.map((r) => r.type),
+        notificationsToSend.map((r) => r.title),
+        notificationsToSend.map((r) => r.content),
+        notificationsToSend.map((r) => r.short_description),
+        notificationsToSend.map((r) => r.status),
+        notificationsToSend.map((r) => r.audience),
+      ]
+    );
+
+    notifications.forEach((n, i) => {
       n.status = "sent";
-      if (n.status == "sent") {
-        notificationsStatus[n.id] = { status: "sent", error: "" };
-      }
+      notificationsStatus[n.id] = {
+        status: res[i] ? "sent" : "error",
+        error: res[i] ? "" : "Failed to insert inbox notification",
+      };
     });
     return notificationsStatus;
   }

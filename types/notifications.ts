@@ -19,9 +19,19 @@ export interface DbNotification {
   short_description: string;
   template?: number;
   status: "pending" | "error" | "sent";
-  last_error?: string
+  last_error?: string;
   audience: string;
 }
+
+export type NotificationInbox = {
+  id: number;
+  audience: string | null;
+  type: string | null;
+  title: string | null;
+  content: string | null;
+  short_description: string | null;
+  status: string | null;
+};
 
 export type NotificationEmail = {
   id: number;
@@ -32,4 +42,3 @@ export type NotificationEmail = {
   short_description: string | null;
   status: string | null;
 };
-
