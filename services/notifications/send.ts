@@ -6,11 +6,13 @@ export default class NotificationsSender {
   private notificationsProvider = new NotificationsProvider();
   constructor() {}
   public async sendNotifications() {
-    // Get data
     const notifications =
       await this.notificationsProvider.fetchPendingNotifications();
-    const users = notifications.flatMap((n) => n.audience);
+    console.debug("Fetched notifications:", notifications);
+    const users = notifications.flatMap((n) => n.audience.split(","));
+    console.debug("Extracted users from notifications:", users);
     const dbUsers = await this.notificationsProvider.fetchUsers(users);
+    console.debug("Fetched users from DB:", dbUsers);
 
     const emailNotificationsToSend: DbNotification[] = [];
     const inboxNotificationsToSend: DbNotification[] = [];
@@ -18,22 +20,27 @@ export default class NotificationsSender {
       const dbAudience = n.audience
         .split(",")
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
-      dbAudience.forEach((u) => {
+      dbAudience.forEach((u, i) => {
         if (u) {
           switch (u.notification_means) {
             case "email":
               emailNotificationsToSend.push({ ...n, audience: u.email });
+              break;
             case "inbox":
               inboxNotificationsToSend.push({ ...n, audience: u.id });
+              break;
             case "all":
               emailNotificationsToSend.push({ ...n, audience: u.email });
               inboxNotificationsToSend.push({ ...n, audience: u.id });
+              break;
             default:
               n.status = "error";
+              n.last_error = `Unknown notification means of user: ${u.id}`;
           }
           n.status = "sent";
         } else {
           n.status = "error";
+          n.last_error = `User ${n.audience[i]} not found`;
         }
       });
     });
@@ -45,27 +52,36 @@ export default class NotificationsSender {
       inboxNotificationsToSend
     );
 
+    notifications.forEach((n) => {
+      n.status =
+        n.status == "sent" &&
+        (emailNotificationsStatus[n.id]?.status == "sent" ||
+          inboxNotificationsStatus[n.id]?.status == "sent")
+          ? "sent"
+          : "error";
+      n.last_error =
+        emailNotificationsStatus[n.id]?.error ||
+        inboxNotificationsStatus[n.id]?.error ||
+        "";
+    });
+
     if (notifications.length > 0) {
       await neonDb.query(
         `
         UPDATE "Notification" AS n
-        SET status = u.status
+        SET status = u.status, last_error = u.last_error
         FROM (
           SELECT
             UNNEST($1::int[]) AS id,
-            UNNEST($2::text[]) AS status
+            UNNEST($2::text[]) AS status,
+            UNNEST($3::text[]) AS last_error
         ) AS u
         WHERE n.id = u.id;
         `,
         [
           notifications.map((n) => n.id),
-          notifications.map((n) =>
-            n.status == "sent" &&
-            emailNotificationsStatus[n.id] == "sent" &&
-            inboxNotificationsStatus[n.id] == "sent"
-              ? "sent"
-              : "error"
-          ),
+          notifications.map((n) => n.status),
+          notifications.map((n) => n.last_error || ""),
         ]
       );
     }
@@ -73,8 +89,10 @@ export default class NotificationsSender {
   }
 
   private async sendEmailNotifications(notifications: DbNotification[]) {
-    const notificationsStatus: { [key: string]: string } = {};
-    const templates = notifications.map((n) => n.template ?? "");
+    const notificationsStatus: {
+      [key: string]: { status: string; error: string };
+    } = {};
+    const templates = notifications.map((n) => n.template ?? 0);
     const dbTemplates = await this.notificationsProvider.fetchTemplates(
       templates
     );
@@ -82,17 +100,19 @@ export default class NotificationsSender {
       const template = dbTemplates.find((t) => t.id == n.template);
       n.status = "sent";
       if (n.status == "sent") {
-        notificationsStatus[n.id] = "sent";
+        notificationsStatus[n.id] = { status: "sent", error: "" };
       }
     });
     return notificationsStatus;
   }
   private async sendInboxNotifications(notifications: DbNotification[]) {
-    const notificationsStatus: { [key: string]: string } = {};
+    const notificationsStatus: {
+      [key: string]: { status: string; error: string };
+    } = {};
     notifications.forEach((n) => {
       n.status = "sent";
       if (n.status == "sent") {
-        notificationsStatus[n.id] = "sent";
+        notificationsStatus[n.id] = { status: "sent", error: "" };
       }
     });
     return notificationsStatus;

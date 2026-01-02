@@ -14,7 +14,8 @@ export default class NotificationsCreator {
       short_description,
       template,
       status,
-      audience 
+      last_error,
+      audience
     )
     SELECT * FROM UNNEST (
       $1::text[], 
@@ -24,7 +25,8 @@ export default class NotificationsCreator {
       $5::text[],
       $6::text[],
       $7::text[],
-      $8::text[]
+      $8::text[],
+      $9::text[]
     )
     RETURNING id;
     `,
@@ -35,8 +37,9 @@ export default class NotificationsCreator {
         notifications.map((r) => r.content_type),
         notifications.map((r) => r.short_description),
         notifications.map((r) => r.template),
-        notifications.map(() => 'pending'),
-        notifications.map((r) => r.audience.concat(',')),
+        notifications.map(() => "pending"),
+        notifications.map(() => ""),
+        notifications.map((r) => r.audience.join(",")),
       ]
     );
   }

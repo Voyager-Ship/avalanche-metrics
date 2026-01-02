@@ -21,9 +21,9 @@ export class NotificationsProvider {
     console.debug(`${dbUsers.length} fetched users`);
     return dbUsers;
   }
-  public async fetchTemplates(templates: string[]) {
-    const dbTemplates = await neonDb.query<{ id: string; template: string }>(
-      `SELECT * FROM "Template" WHERE id = ANY($1)`,
+  public async fetchTemplates(templates: number[]) {
+    const dbTemplates = await neonDb.query<{ id: number; template: string }>(
+      `SELECT * FROM "NotificationTemplate" WHERE id = ANY($1)`,
       [templates.map((u) => u)]
     );
     console.debug(`${dbTemplates.length} fetched templates`);
