@@ -8,11 +8,9 @@ export default class NotificationsGetter {
     console.debug("Getting notifications for users:", users);
     const notifications = await neonDb.query(
       `
-  SELECT *
+  SELECT TOP 20 *
   FROM "NotificationInbox"
-  WHERE
-    status = 'sent'
-    AND audience = ANY($1::text[])
+  WHERE AND audience = ANY($1::text[])
   `,
       [users]
     );
