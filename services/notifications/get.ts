@@ -7,16 +7,15 @@ export default class NotificationsGetter {
     const data: { [key: string]: DbNotification[] } = {};
     console.debug("Getting notifications for users:", users);
     const notifications = await neonDb.query(
-  `
+      `
   SELECT *
-  FROM "Notification"
+  FROM "NotificationInbox"
   WHERE
     status = 'sent'
-    AND string_to_array(audience, ',')::text[] && $1::text[]
-    AND NOT (string_to_array(COALESCE(notified_audience, ''), ',')::text[] && $1::text[])
+    AND audience = ANY($1::text[])
   `,
-  [users]
-);
+      [users]
+    );
 
     users.forEach((user) => {
       data[user] = notifications.filter((n) =>

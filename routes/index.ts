@@ -9,7 +9,7 @@ import { readNotifications } from "../controllers/notifications/read";
 
 const router = Router();
 
-router.post("/notifications/get", getNotifications);
+router.post("/notifications/get/inbox", getNotifications);
 router.post("/notifications/create", createNotifications);
 router.post("/notifications/send", sendNotifications);
 router.post("/notifications/read", readNotifications);

@@ -24,7 +24,6 @@ export default class NotificationsSender {
       const dbAudience = n.audience
         .split(",")
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
-      console.log("DB AUDIENCE:", dbAudience);
       dbAudience.forEach((u, i) => {
         if (u) {
           switch (u.notification_means) {
@@ -51,7 +50,6 @@ export default class NotificationsSender {
         }
       });
     });
-    console.log("INBOX NOTIFICATIONS TO SEND:", inboxNotificationsToSend);
 
     const emailNotificationsStatus = await this.sendEmailNotifications(
       emailNotificationsToSend
