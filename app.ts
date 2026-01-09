@@ -1,6 +1,6 @@
 import express from 'express';
 import indexRouter from './routes/index';
-import { apiKeyAuth } from './middlewares/auth'
+import { apiKeyAuth } from './middlewares/apiKeyAuth'
 import cors from 'cors';
 import dns from 'node:dns';
 
