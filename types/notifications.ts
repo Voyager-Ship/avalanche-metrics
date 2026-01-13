@@ -1,3 +1,4 @@
+
 export interface InputNotification {
   id: string;
   title: string;
@@ -7,7 +8,13 @@ export interface InputNotification {
   short_description: string;
   template?: string;
   status: "pending" | "error" | "sent";
-  audience: string[];
+  audience: NotificationAudience;
+}
+
+export interface NotificationAudience {
+  all: boolean
+  users: string[];
+  hackathons?: string[];
 }
 
 export interface DbNotification {

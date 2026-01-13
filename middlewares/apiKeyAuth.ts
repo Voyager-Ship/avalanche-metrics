@@ -9,6 +9,7 @@ type ExcludedRoute = {
 const JWT_AUTH_ROUTES: ExcludedRoute[] = [
   { method: 'POST', path: /^\/notifications\/get\/inbox$/ },
   { method: 'POST', path: /^\/notifications\/read$/ },
+  { method: 'POST', path: /^\/notifications\/create$/ },
 ];
 
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {

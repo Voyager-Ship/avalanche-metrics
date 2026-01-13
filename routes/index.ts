@@ -11,7 +11,7 @@ import { jwtAuth } from "../middlewares/jwtAuth";
 const router = Router();
 
 router.post("/notifications/get/inbox", jwtAuth, getNotifications);
-router.post("/notifications/create", createNotifications);
+router.post("/notifications/create", jwtAuth, createNotifications);
 router.post("/notifications/send", sendNotifications);
 router.post("/notifications/read", jwtAuth, readNotifications);
 router.post("/users/contributions", getUsersContributions);
