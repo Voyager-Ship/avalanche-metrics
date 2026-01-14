@@ -13,7 +13,6 @@ export const getNotifications = async (req: Request, res: Response) => {
   }
 
   try {
-    // Mantengo tu firma actual: getNotifications(users: string[])
     const data = await notificationsGetter.getNotifications([userId]);
     return res.json(data);
   } catch (err: unknown) {

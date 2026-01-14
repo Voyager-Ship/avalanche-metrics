@@ -1,44 +1,60 @@
 import { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
 
 type AuthedRequest = Request & {
   user?: { id: string };
 };
 
-const JWT_SECRET: string | undefined = process.env.JWT_SECRET;
+const BUILDER_HUB_URL: string | undefined =
+  process.env.AVALANCHE_BUILDER_HUB_URL;
 
-export function jwtAuth(req: Request, res: Response, next: NextFunction): void {
-  if (!JWT_SECRET) {
-    res.status(500).json({ error: "server misconfiguration: JWT_SECRET not set" });
+export async function jwtAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!BUILDER_HUB_URL) {
+    res
+      .status(500)
+      .json({ error: "Error at validate jwt token" });
     return;
   }
 
-  const authHeader: string | undefined = req.header("authorization") ?? undefined;
+  const authHeader: string | undefined = req.header("authorization");
   if (!authHeader) {
     res.status(401).json({ error: "missing authorization header" });
     return;
   }
 
-  const token: string = authHeader;
-
   try {
-    const decoded: string | JwtPayload = jwt.verify(token, JWT_SECRET);
+    const response = await fetch(
+      `${BUILDER_HUB_URL}/api/validate-jwt-token`,
+      {
+        method: "POST",
+        headers: {
+          authorization: authHeader,
+          "content-type": "application/json",
+        },
+      }
+    );
 
-    // jwt.verify puede devolver string si el payload era string; nosotros esperamos objeto
-    if (typeof decoded === "string") {
-      res.status(401).json({ error: "invalid token payload" });
+    if (!response.ok) {
+      const text: string = await response.text();
+      res.status(401).json({ error: "invalid token", details: text });
       return;
     }
 
-    const sub: unknown = decoded.sub;
-    if (typeof sub !== "string" || sub.length === 0) {
-      res.status(401).json({ error: "token missing subject (sub)" });
-      return;
+    const data: { valid: boolean, message: string, sub: string } = await response.json();
+    console.log('TOKEN DATA: ', data)
+    if (data.valid) {
+      (req as AuthedRequest).user = { id: data.sub };
+      next()
+    } else {
+      res.status(401).json({ error: "invalid token", details: data.message });
     }
-
-    (req as AuthedRequest).user = { id: sub };
-    next();
   } catch (err: unknown) {
-    res.status(401).json({ error: "invalid token", details: String(err) });
+    res.status(401).json({
+      error: "token validation service error",
+      details: String(err),
+    });
   }
 }
