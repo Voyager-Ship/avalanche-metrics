@@ -10,5 +10,3 @@ const payload = {
 const token: string = jwt.sign(payload, JWT_SECRET, {
   expiresIn: "4h",
 });
-
-console.log(token);

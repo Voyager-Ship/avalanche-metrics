@@ -1,10 +1,12 @@
 import { Request, Response } from "express";
 import NotificationsCreator from "../../services/notifications/create";
+import { AuthedRequest } from '../../types/common'
+
 
 const notificationsCreator = new NotificationsCreator();
 
-export const createNotifications = async (req: Request, res: Response) => {
-  const { notifications } = req.body;
+export const createNotifications = async (req: AuthedRequest, res: Response) => {
+  const { notifications } = req.body as unknown as any;
 
   if (
     !notifications ||
@@ -17,7 +19,7 @@ export const createNotifications = async (req: Request, res: Response) => {
   }
 
   try {
-    await notificationsCreator.createNotifications(notifications);
+    await notificationsCreator.createNotifications(req.user?.id ?? '', notifications);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({

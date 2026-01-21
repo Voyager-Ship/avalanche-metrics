@@ -4,70 +4,134 @@ import { neonDb } from "../infrastructure/neon";
 
 export default class NotificationsCreator {
   private notificationProvider = new NotificationsProvider();
-  constructor() { }
-  public async createNotifications(notifications: InputNotification[]) {
+  constructor() {}
+  public async createNotifications(
+    authUser: string,
+    notifications: InputNotification[],
+  ) {
     let allUsers: string[] = [];
     let hackathonsData: { [key: string]: string[] } = {};
 
-    if (notifications.length === 0) { return }
+    const hackathonsDB = await this.notificationProvider.fetchHackathons(
+      notifications.flatMap((n) => n.audience.hackathons ?? []),
+    );
 
-    if (notifications.some((n) => n.audience.all)) {
-      allUsers = (await this.notificationProvider.fetchAllUsers()).map((u) => u.id);
-    } else if (notifications.some((n) => n.audience.hackathons?.length ?? 0 > 0)) {
-      hackathonsData = await this.notificationProvider.fetchUsersFromHackathons(notifications)
+    const authUserDB = await this.notificationProvider.fetchUsers([authUser]);
+
+    // There are notifications
+    if (notifications.length === 0) {
+      return;
     }
 
-      neonDb.query(
-        `
-      INSERT INTO "Notification" (
-        type, 
-        title,
-        content,
-        content_type,
-        short_description,
-        template,
-        status,
-        last_error,
-        audience
-      )
-      SELECT * FROM UNNEST (
-        $1::text[], 
-        $2::text[], 
-        $3::text[], 
-        $4::text[], 
-        $5::text[],
-        $6::text[],
-        $7::text[],
-        $8::text[],
-        $9::text[]
-      )
-      RETURNING id;
-      `,
-        [
-          notifications.map((r) => r.type),
-          notifications.map((r) => r.title),
-          notifications.map((r) => r.content),
-          notifications.map((r) => r.content_type),
-          notifications.map((r) => r.short_description),
-          notifications.map((r) => r.template),
-          notifications.map(() => "pending"),
-          notifications.map(() => ""),
-          notifications.map((r) => this.getNotificationAudience(r, allUsers, hackathonsData)),
-        ]
+    // Modify notifications based on user roles
+    const notificationsToSend: InputNotification[] = [];
+    notifications.forEach((n) => {
+      const notificationToSend = {
+        ...n,
+        audience: {
+          all: authUserDB[0].role == "admin" ? n.audience.all : false,
+          users: authUserDB[0].role == "admin" ? n.audience.users : [],
+          hackathons:
+            authUserDB[0].role == "admin"
+              ? n.audience.hackathons
+              : n.audience.hackathons?.filter((h) =>
+                  hackathonsDB.some(
+                    (hDB) =>
+                      hDB.id == h &&
+                      (hDB.admins.includes(authUserDB[0].id) ||
+                        hDB.admins.includes(authUserDB[0].email)),
+                  ),
+                ),
+        },
+      };
+      if (
+        notificationToSend.audience.all ||
+        (notificationToSend.audience.users &&
+          notificationToSend.audience.users.length > 0) ||
+        (notificationToSend.audience.hackathons &&
+          notificationToSend.audience.hackathons.length > 0)
+      ) {
+        notificationsToSend.push(notificationToSend);
+      }
+    });
+
+    if (notificationsToSend.some((n) => n.audience.all)) {
+      allUsers = (await this.notificationProvider.fetchAllUsers()).map(
+        (u) => u.id,
       );
-  }
-  private getNotificationAudience(notification: InputNotification, allUsers: string[], hackathonsData: { [key: string]: string[] }): string {
-    let audience: string = '';
-    if (notification.audience.all) {
-      return allUsers.join(',');
+    } else if (
+      notificationsToSend.some((n) => n.audience.hackathons?.length ?? 0 > 0)
+    ) {
+      hackathonsData =
+        await this.notificationProvider.fetchUsersFromHackathons(
+          notificationsToSend,
+        );
     }
-    if (notification.audience.hackathons && notification.audience.hackathons.length > 0) {
-      const users = notification.audience.hackathons.flatMap((h) => hackathonsData[h] || []);
-      audience = users.join(',');
+
+    neonDb.query(
+      `
+    INSERT INTO "Notification" (
+      type,
+      title,
+      content,
+      content_type,
+      short_description,
+      template,
+      status,
+      last_error,
+      audience
+    )
+    SELECT * FROM UNNEST (
+      $1::text[],
+      $2::text[],
+      $3::text[],
+      $4::text[],
+      $5::text[],
+      $6::text[],
+      $7::text[],
+      $8::text[],
+      $9::text[]
+    )
+    RETURNING id;
+    `,
+      [
+        notificationsToSend.map((r) => r.type),
+        notificationsToSend.map((r) => r.title),
+        notificationsToSend.map((r) => r.content),
+        notificationsToSend.map((r) => r.content_type),
+        notificationsToSend.map((r) => r.short_description),
+        notificationsToSend.map((r) => r.template),
+        notificationsToSend.map(() => "pending"),
+        notificationsToSend.map(() => ""),
+        notificationsToSend.map((r) =>
+          this.getNotificationAudience(r, allUsers, hackathonsData),
+        ),
+      ],
+    );
+  }
+  private getNotificationAudience(
+    notification: InputNotification,
+    allUsers: string[],
+    hackathonsData: { [key: string]: string[] },
+  ): string {
+    let audience: string = "";
+    if (notification.audience.all) {
+      return allUsers.join(",");
+    }
+    if (
+      notification.audience.hackathons &&
+      notification.audience.hackathons.length > 0
+    ) {
+      const users = notification.audience.hackathons.flatMap(
+        (h) => hackathonsData[h] || [],
+      );
+      audience = users.join(",");
     }
     if (notification.audience.users && notification.audience.users.length > 0) {
-      audience = audience ? audience + ',' + notification.audience.users.join(',') : notification.audience.users.join(',');
+      audience = audience
+        ? audience + "," + notification.audience.users.join(",")
+        : notification.audience.users.join(",");
     }
-    return audience
+    return audience;
   }
 }

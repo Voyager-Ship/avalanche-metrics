@@ -44,7 +44,6 @@ export async function jwtAuth(
     }
 
     const data: { valid: boolean, message: string, sub: string } = await response.json();
-    console.log('TOKEN DATA: ', data)
     if (data.valid) {
       (req as AuthedRequest).user = { id: data.sub };
       next()
