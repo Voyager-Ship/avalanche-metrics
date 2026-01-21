@@ -26,7 +26,7 @@ export class NotificationsProvider {
     const dbUsers = await neonDb.query<{
       id: string;
       email: string;
-      notification_means: string;
+      custom_attributes: string;
       role: string
     }>(`SELECT * FROM "User" WHERE id = ANY($1) OR email = ANY($1)`, [
       users.map((u) => u),

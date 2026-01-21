@@ -29,10 +29,10 @@ export default class NotificationsCreator {
       const notificationToSend = {
         ...n,
         audience: {
-          all: authUserDB[0].role == "admin" ? n.audience.all : false,
-          users: authUserDB[0].role == "admin" ? n.audience.users : [],
+          all: authUserDB[0].custom_attributes.includes("admin") ? n.audience.all : false,
+          users: authUserDB[0].custom_attributes.includes("admin") ? n.audience.users : [],
           hackathons:
-            authUserDB[0].role == "admin"
+            authUserDB[0].custom_attributes.includes("admin")
               ? n.audience.hackathons
               : n.audience.hackathons?.filter((h) =>
                   hackathonsDB.some(
