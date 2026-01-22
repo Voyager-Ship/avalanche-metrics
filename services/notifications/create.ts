@@ -34,7 +34,10 @@ export default class NotificationsCreator {
             : false,
           users: authUserDB[0].custom_attributes.includes("admin")
             ? n.audience.users
-            : [],
+            : n.audience.users.includes(authUserDB[0].id) ||
+                n.audience.users.includes(authUserDB[0].email)
+              ? [authUserDB[0].id]
+              : [],
           hackathons: authUserDB[0].custom_attributes.includes("admin")
             ? n.audience.hackathons
             : authUserDB[0].custom_attributes.includes("hackathon_judge")
