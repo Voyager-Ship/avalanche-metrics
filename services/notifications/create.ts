@@ -29,19 +29,24 @@ export default class NotificationsCreator {
       const notificationToSend = {
         ...n,
         audience: {
-          all: authUserDB[0].custom_attributes.includes("admin") ? n.audience.all : false,
-          users: authUserDB[0].custom_attributes.includes("admin") ? n.audience.users : [],
-          hackathons:
-            authUserDB[0].custom_attributes.includes("admin")
-              ? n.audience.hackathons
-              : n.audience.hackathons?.filter((h) =>
+          all: authUserDB[0].custom_attributes.includes("admin")
+            ? n.audience.all
+            : false,
+          users: authUserDB[0].custom_attributes.includes("admin")
+            ? n.audience.users
+            : [],
+          hackathons: authUserDB[0].custom_attributes.includes("admin")
+            ? n.audience.hackathons
+            : authUserDB[0].custom_attributes.includes("hackathon_judge")
+              ? n.audience.hackathons?.filter((h) =>
                   hackathonsDB.some(
                     (hDB) =>
                       hDB.id == h &&
                       (hDB.admins.includes(authUserDB[0].id) ||
                         hDB.admins.includes(authUserDB[0].email)),
                   ),
-                ),
+                )
+              : [],
         },
       };
       if (
