@@ -27,6 +27,7 @@ export class NotificationsProvider {
       email: string;
       custom_attributes: string;
       role: string
+      notification_means: string
     }>(`SELECT * FROM "User" WHERE id = ANY($1) OR email = ANY($1)`, [
       users.map((u) => u),
     ]);

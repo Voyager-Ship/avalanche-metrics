@@ -5,7 +5,7 @@ import { AuthedRequest } from '../../types/common'
 
 const notificationsCreator = new NotificationsCreator();
 
-export const createNotifications = async (req: AuthedRequest, res: Response) => {
+export const createNotifications = async (req: Request, res: Response) => {
   const { notifications } = req.body as unknown as any;
 
   if (
@@ -19,7 +19,7 @@ export const createNotifications = async (req: AuthedRequest, res: Response) => 
   }
 
   try {
-    await notificationsCreator.createNotifications(req.user?.id ?? '', notifications);
+    await notificationsCreator.createNotifications((req as unknown as AuthedRequest).user?.id ?? '', notifications);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({
