@@ -26,20 +26,11 @@ export default class NotificationsSender {
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
       dbAudience.forEach((u, i) => {
         if (u) {
-          switch (u.notification_means) {
-            case "email":
-              emailNotificationsToSend.push({ ...n, audience: u.email });
-              break;
-            case "inbox":
-              inboxNotificationsToSend.push({ ...n, audience: u.id });
-              break;
-            case "all":
-              emailNotificationsToSend.push({ ...n, audience: u.email });
-              inboxNotificationsToSend.push({ ...n, audience: u.id });
-              break;
-            default:
-              n.status = "error";
-              n.last_error = `Unknown notification means of user: ${u.id}`;
+          if (u.notification_means && u.notification_means[n.type] && u.notification_means[n.type][0]) {
+            inboxNotificationsToSend.push({ ...n, audience: u.id });
+          }
+          if (u.notification_means && u.notification_means[n.type] && u.notification_means[n.type][1]) {
+            emailNotificationsToSend.push({ ...n, audience: u.email });
           }
           if (n.status == "pending") {
             n.status = "sent";
@@ -52,10 +43,10 @@ export default class NotificationsSender {
     });
 
     const emailNotificationsStatus = await this.sendEmailNotifications(
-      emailNotificationsToSend
+      emailNotificationsToSend,
     );
     const inboxNotificationsStatus = await this.sendInboxNotifications(
-      inboxNotificationsToSend
+      inboxNotificationsToSend,
     );
 
     notifications.forEach((n) => {
@@ -88,7 +79,7 @@ export default class NotificationsSender {
           notifications.map((n) => n.id),
           notifications.map((n) => n.status),
           notifications.map((n) => n.last_error || ""),
-        ]
+        ],
       );
     }
     return notifications;
@@ -99,9 +90,8 @@ export default class NotificationsSender {
       [key: string]: { status: string; error: string };
     } = {};
     const templates = notifications.map((n) => n.template ?? 0);
-    const dbTemplates = await this.notificationsProvider.fetchTemplates(
-      templates
-    );
+    const dbTemplates =
+      await this.notificationsProvider.fetchTemplates(templates);
     notifications.forEach((n) => {
       const template = dbTemplates.find((t) => t.id == n.template);
       n.status = "sent";
@@ -153,7 +143,7 @@ export default class NotificationsSender {
         notificationsToSend.map((r) => r.short_description),
         notificationsToSend.map((r) => r.status),
         notificationsToSend.map((r) => r.audience),
-      ]
+      ],
     );
 
     notifications.forEach((n, i) => {

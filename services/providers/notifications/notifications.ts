@@ -1,13 +1,16 @@
 import { neonDb } from "../../infrastructure/neon";
-import { DbNotification, InputNotification } from "../../../types/notifications";
+import {
+  DbNotification,
+  InputNotification,
+} from "../../../types/notifications";
 
 export class NotificationsProvider {
-
-  constructor() { }
+  constructor() {}
 
   public async fetchHackathons(hackathons: string[]) {
-    const hackathonsDb = await neonDb.query<{id: string, admins: string}>(
-      `SELECT * FROM "Hackathon" WHERE id LIKE ANY($1)`, [hackathons]
+    const hackathonsDb = await neonDb.query<{ id: string; admins: string }>(
+      `SELECT * FROM "Hackathon" WHERE id LIKE ANY($1)`,
+      [hackathons],
     );
     console.debug(`${hackathonsDb.length} fetched hackathons`);
     return hackathonsDb;
@@ -15,7 +18,7 @@ export class NotificationsProvider {
 
   public async fetchPendingNotifications() {
     const notifications = await neonDb.query<DbNotification>(
-      `SELECT * FROM "Notification" WHERE status = 'pending'`
+      `SELECT * FROM "Notification" WHERE status = 'pending'`,
     );
     console.debug(`${notifications.length} fetched notifications`);
     return notifications;
@@ -26,8 +29,8 @@ export class NotificationsProvider {
       id: string;
       email: string;
       custom_attributes: string;
-      role: string
-      notification_means: string
+      role: string;
+      notification_means: { [key: string]: [boolean, boolean] };
     }>(`SELECT * FROM "User" WHERE id = ANY($1) OR email = ANY($1)`, [
       users.map((u) => u),
     ]);
@@ -46,7 +49,11 @@ export class NotificationsProvider {
 
   public async fetchUsersFromHackathons(notifications: InputNotification[]) {
     const data: { [key: string]: string[] } = {};
-    const dbData = await neonDb.query<{ hackathon_id: string; users: string[] }>(`
+    const dbData = await neonDb.query<{
+      hackathon_id: string;
+      users: string[];
+    }>(
+      `
       SELECT 
         h.id AS hackathon_id,
         ARRAY_AGG(DISTINCT m.user_id) AS users
@@ -55,16 +62,21 @@ export class NotificationsProvider {
       JOIN "Member" m ON m.project_id = p.id
       WHERE h.id = ANY($1) 
       GROUP BY h.id;
-       `, [
-      notifications.flatMap((n) => n.audience.hackathons! ?? []),
-    ])
+       `,
+      [notifications.flatMap((n) => n.audience.hackathons! ?? [])],
+    );
     dbData.forEach((row) => {
       if (!data[row.hackathon_id]) {
         data[row.hackathon_id] = row.users.filter((u) => u !== null);
       } else {
-        data[row.hackathon_id] = [...data[row.hackathon_id], ...row.users.filter((u) => u !== null && !data[row.hackathon_id]?.includes(u))];
+        data[row.hackathon_id] = [
+          ...data[row.hackathon_id],
+          ...row.users.filter(
+            (u) => u !== null && !data[row.hackathon_id]?.includes(u),
+          ),
+        ];
       }
-    })
+    });
 
     console.debug(`${Object.keys(data).length} fetched hackathons`);
     return data;
@@ -73,7 +85,7 @@ export class NotificationsProvider {
   public async fetchTemplates(templates: number[]) {
     const dbTemplates = await neonDb.query<{ id: number; template: string }>(
       `SELECT * FROM "NotificationTemplate" WHERE id = ANY($1)`,
-      [templates.map((u) => u)]
+      [templates.map((u) => u)],
     );
     console.debug(`${dbTemplates.length} fetched templates`);
     return dbTemplates;
