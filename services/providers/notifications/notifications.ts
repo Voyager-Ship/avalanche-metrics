@@ -18,7 +18,7 @@ export class NotificationsProvider {
 
   public async fetchPendingNotifications() {
     const notifications = await neonDb.query<DbNotification>(
-      `SELECT * FROM "Notification" WHERE status = 'pending'`,
+      `SELECT * FROM "Notification" WHERE status = 'pending' OR status = 'warning`,
     );
     console.debug(`${notifications.length} fetched notifications`);
     return notifications;

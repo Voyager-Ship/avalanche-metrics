@@ -34,11 +34,10 @@ if (!baseUrl) {
   throw new Error("APP_BASE_URL is not defined");
 }
 
-
-startSendNotificationsWorker({
-  endpointUrl: "http://localhost:3000/notifications/send",
-  intervalMs: 60 * 1000,
-  timeoutMs: 30 * 1000,
-});
+// startSendNotificationsWorker({
+//   endpointUrl: "http://localhost:3000/notifications/send",
+//   intervalMs: 60 * 1000,
+//   timeoutMs: 30 * 1000,
+// });
 
 export default app;

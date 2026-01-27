@@ -1,13 +1,15 @@
 import { NotificationsProvider } from "../providers/notifications/notifications";
-import {
-  DbNotification,
-  InputNotification,
-  NotificationInbox,
-} from "../../types/notifications";
+import { DbNotification, NotificationInbox } from "../../types/notifications";
 import { neonDb } from "../infrastructure/neon";
+import { NotificationSendEmailStrategy } from "../strategies/notificationSendEmail";
+import { NotificationSendInboxStrategy } from "../strategies/notificationSendInbox";
 
 export default class NotificationsSender {
   private notificationsProvider = new NotificationsProvider();
+
+  private emailSender = new NotificationSendEmailStrategy();
+  private inboxSender = new NotificationSendInboxStrategy();
+
   constructor() {}
   public async sendNotifications() {
     const notifications =
@@ -26,18 +28,30 @@ export default class NotificationsSender {
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
       dbAudience.forEach((u, i) => {
         if (u) {
-          if (u.notification_means && u.notification_means[n.type] && u.notification_means[n.type][0]) {
+          if (
+            u.notification_means &&
+            u.notification_means[n.type] &&
+            u.notification_means[n.type][0]
+          ) {
             inboxNotificationsToSend.push({ ...n, audience: u.id });
           }
-          if (u.notification_means && u.notification_means[n.type] && u.notification_means[n.type][1]) {
+          if (
+            u.notification_means &&
+            u.notification_means[n.type] &&
+            u.notification_means[n.type][1]
+          ) {
             emailNotificationsToSend.push({ ...n, audience: u.email });
           }
           if (n.status == "pending") {
-            n.status = "sent";
+            n.status = "sending";
           }
         } else {
-          n.status = "error";
-          n.last_error = `User ${n.audience[i]} not found`;
+          inboxNotificationsToSend.push({
+            ...n,
+            audience: n.audience.split(",")[i],
+            status: "userNotFound",
+          });
+          n.status = "userNotFound";
         }
       });
     });
@@ -52,21 +66,19 @@ export default class NotificationsSender {
     notifications.forEach((n) => {
       n.status =
         n.status == "sent" &&
-        (emailNotificationsStatus[n.id]?.status == "sent" ||
-          inboxNotificationsStatus[n.id]?.status == "sent")
+        !(
+          emailNotificationsStatus[n.id]?.status == "error" ||
+          inboxNotificationsStatus[n.id]?.status == "error"
+        )
           ? "sent"
           : "error";
-      n.last_error =
-        emailNotificationsStatus[n.id]?.error ||
-        inboxNotificationsStatus[n.id]?.error ||
-        "";
     });
 
     if (notifications.length > 0) {
       await neonDb.query(
         `
         UPDATE "Notification" AS n
-        SET status = u.status, last_error = u.last_error
+        SET status = u.status 
         FROM (
           SELECT
             UNNEST($1::int[]) AS id,
@@ -75,11 +87,7 @@ export default class NotificationsSender {
         ) AS u
         WHERE n.id = u.id;
         `,
-        [
-          notifications.map((n) => n.id),
-          notifications.map((n) => n.status),
-          notifications.map((n) => n.last_error || ""),
-        ],
+        [notifications.map((n) => n.id), notifications.map((n) => n.status)],
       );
     }
     return notifications;
@@ -89,16 +97,7 @@ export default class NotificationsSender {
     const notificationsStatus: {
       [key: string]: { status: string; error: string };
     } = {};
-    const templates = notifications.map((n) => n.template ?? 0);
-    const dbTemplates =
-      await this.notificationsProvider.fetchTemplates(templates);
-    notifications.forEach((n) => {
-      const template = dbTemplates.find((t) => t.id == n.template);
-      n.status = "sent";
-      if (n.status == "sent") {
-        notificationsStatus[n.id] = { status: "sent", error: "" };
-      }
-    });
+    const response = await this.emailSender.send(notifications);
     return notificationsStatus;
   }
   private async sendInboxNotifications(notifications: DbNotification[]) {

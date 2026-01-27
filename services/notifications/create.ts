@@ -29,18 +29,18 @@ export default class NotificationsCreator {
       const notificationToSend = {
         ...n,
         audience: {
-          all: authUserDB[0].custom_attributes.includes("admin")
+          all: authUserDB[0].custom_attributes.includes("devrel")
             ? n.audience.all
             : false,
-          users: authUserDB[0].custom_attributes.includes("admin")
+          users: authUserDB[0].custom_attributes.includes("devrel")
             ? n.audience.users
             : n.audience.users.includes(authUserDB[0].id) ||
                 n.audience.users.includes(authUserDB[0].email)
               ? [authUserDB[0].id]
               : [],
-          hackathons: authUserDB[0].custom_attributes.includes("admin")
+          hackathons: authUserDB[0].custom_attributes.includes("devrel")
             ? n.audience.hackathons
-            : authUserDB[0].custom_attributes.includes("hackathon_judge")
+            : authUserDB[0].custom_attributes.includes("notify_event")
               ? n.audience.hackathons?.filter((h) =>
                   hackathonsDB.some(
                     (hDB) =>
@@ -75,33 +75,60 @@ export default class NotificationsCreator {
           notificationsToSend,
         );
     }
+    console.log('Notifications to send: ', notificationsToSend);
 
-    neonDb.query(
+    await neonDb.query(
       `
-    INSERT INTO "Notification" (
-      type,
-      title,
-      content,
-      content_type,
-      short_description,
-      template,
-      status,
-      last_error,
-      audience
-    )
-    SELECT * FROM UNNEST (
-      $1::text[],
-      $2::text[],
-      $3::text[],
-      $4::text[],
-      $5::text[],
-      $6::text[],
-      $7::text[],
-      $8::text[],
-      $9::text[]
-    )
-    RETURNING id;
-    `,
+  INSERT INTO "Notification" (
+    type,
+    title,
+    content,
+    content_type,
+    short_description,
+    template,
+    status,
+    last_error,
+    audience,
+    creator,
+    created_at
+  )
+  SELECT
+    u.type,
+    u.title,
+    u.content,
+    u.content_type,
+    u.short_description,
+    u.template,
+    u.status,
+    u.last_error,
+    u.audience,
+    u.creator,
+    NOW()
+  FROM UNNEST(
+    $1::text[],
+    $2::text[],
+    $3::text[],
+    $4::text[],
+    $5::text[],
+    $6::text[],
+    $7::text[],
+    $8::text[],
+    $9::text[],
+    $10::text[]
+  ) AS u(
+    type,
+    title,
+    content,
+    content_type,
+    short_description,
+    template,
+    status,
+    last_error,
+    audience,
+    creator
+  )
+  RETURNING id;
+  `,
       [
         notificationsToSend.map((r) => r.type),
         notificationsToSend.map((r) => r.title),
@@ -114,6 +141,7 @@ export default class NotificationsCreator {
         notificationsToSend.map((r) =>
           this.getNotificationAudience(r, allUsers, hackathonsData),
         ),
+        notificationsToSend.map(() => authUserDB[0].id),
       ],
     );
   }
