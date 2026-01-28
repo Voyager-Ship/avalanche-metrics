@@ -1,8 +1,8 @@
 import { NotificationsProvider } from "../providers/notifications/notifications";
-import { DbNotification, NotificationInbox } from "../../types/notifications";
-import { neonDb } from "../infrastructure/neon";
+import { DbNotification, DbNotificationState } from "../../types/notifications";
 import { NotificationSendEmailStrategy } from "../strategies/notificationSendEmail";
 import { NotificationSendInboxStrategy } from "../strategies/notificationSendInbox";
+import { neonDb } from "../infrastructure/neon";
 
 export default class NotificationsSender {
   private notificationsProvider = new NotificationsProvider();
@@ -13,145 +13,126 @@ export default class NotificationsSender {
   constructor() {}
   public async sendNotifications() {
     const notifications =
-      await this.notificationsProvider.fetchPendingNotifications();
-    console.debug("Fetched notifications:", notifications);
+      await this.notificationsProvider.fetchUnsentNotifications();
+
+    const { inboxRetryNotificationsStates, emailRetryNotificationsStates } =
+      await this.notificationsProvider.fetchRetryNotificationsStates();
+
     const users = notifications.flatMap((n) => n.audience.split(","));
-    console.debug("Extracted users from notifications:", users);
     const dbUsers = await this.notificationsProvider.fetchUsers(users);
-    console.debug("Fetched users from DB:", dbUsers);
 
     const emailNotificationsToSend: DbNotification[] = [];
     const inboxNotificationsToSend: DbNotification[] = [];
+
     notifications.forEach((n) => {
       const dbAudience = n.audience
         .split(",")
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
       dbAudience.forEach((u, i) => {
         if (u) {
+          let added = false;
           if (
             u.notification_means &&
             u.notification_means[n.type] &&
             u.notification_means[n.type][0]
           ) {
-            inboxNotificationsToSend.push({ ...n, audience: u.id });
+            inboxNotificationsToSend.push({
+              ...n,
+              audience: u.id,
+              status: n.status == "pending" ? "sending" : "retrying",
+            });
+            added = true;
           }
           if (
             u.notification_means &&
             u.notification_means[n.type] &&
             u.notification_means[n.type][1]
           ) {
-            emailNotificationsToSend.push({ ...n, audience: u.email });
+            emailNotificationsToSend.push({
+              ...n,
+              audience: u.email,
+              status: n.status == "pending" ? "sending" : "retrying",
+            });
+            added = true;
           }
-          if (n.status == "pending") {
-            n.status = "sending";
+          if (added) {
+            n.status = n.status === "pending" ? "sending" : "retrying";
+          } else {
+            inboxNotificationsToSend.push({
+              ...n,
+              audience: u.id,
+              status: "error",
+              error: "No notification means enabled",
+            });
           }
         } else {
           inboxNotificationsToSend.push({
             ...n,
             audience: n.audience.split(",")[i],
-            status: "userNotFound",
+            status: "error",
+            error: "User not found",
           });
-          n.status = "userNotFound";
+          n.status = "retry";
         }
       });
     });
+    console.log("Notifications: ", notifications);
+    console.log("Inbox notifications to send: ", inboxNotificationsToSend);
+    console.log("Email notifications to send: ", emailNotificationsToSend);
 
-    const emailNotificationsStatus = await this.sendEmailNotifications(
+    const emailNotificationsStatus = await this.emailSender.send(
       emailNotificationsToSend,
+      emailRetryNotificationsStates,
     );
-    const inboxNotificationsStatus = await this.sendInboxNotifications(
-      inboxNotificationsToSend,
-    );
+    console.log("Email notifications status: ", emailNotificationsStatus);
+
+    // const inboxNotificationsStatus = await this.sendInboxNotifications(
+    //   inboxNotificationsToSend,
+    // );
 
     notifications.forEach((n) => {
-      n.status =
-        n.status == "sent" &&
-        !(
-          emailNotificationsStatus[n.id]?.status == "error" ||
-          inboxNotificationsStatus[n.id]?.status == "error"
-        )
-          ? "sent"
-          : "error";
+      if (emailNotificationsStatus[n.id].status == 'retry') {
+        n.status = "retry";
+      }
+      if (emailNotificationsStatus[n.id].status == 'error') {
+        n.status = "error";
+      }
     });
 
     if (notifications.length > 0) {
       await neonDb.query(
         `
         UPDATE "Notification" AS n
-        SET status = u.status 
+        SET status = u.status
         FROM (
           SELECT
             UNNEST($1::int[]) AS id,
-            UNNEST($2::text[]) AS status,
-            UNNEST($3::text[]) AS last_error
+            UNNEST($2::text[]) AS status
         ) AS u
         WHERE n.id = u.id;
         `,
-        [notifications.map((n) => n.id), notifications.map((n) => n.status)],
+        [
+          notifications.map((n) => n.id),
+          notifications.map((n) => {
+            let status = "sent";
+            console.log(
+              "EMAIL STATUS: ",
+              emailNotificationsStatus[n.id]?.status,
+            );
+            status = emailNotificationsStatus[n.id]?.status || status;
+            return status;
+          }),
+        ],
       );
     }
     return notifications;
   }
 
-  private async sendEmailNotifications(notifications: DbNotification[]) {
-    const notificationsStatus: {
-      [key: string]: { status: string; error: string };
-    } = {};
-    const response = await this.emailSender.send(notifications);
-    return notificationsStatus;
-  }
   private async sendInboxNotifications(notifications: DbNotification[]) {
-    console.debug(`Sending ${notifications.length} inbox notifications:`);
     const notificationsStatus: {
       [key: string]: { status: string; error: string };
     } = {};
-
-    const notificationsToSend: NotificationInbox[] = notifications.map((n) => ({
-      id: 0,
-      audience: n.audience,
-      type: n.type,
-      title: n.title,
-      content: n.content,
-      short_description: n.short_description,
-      status: "sent",
-    }));
-    const res = await neonDb.query<{ id: number }>(
-      `
-    INSERT INTO "NotificationInbox" (
-      type,
-      title,
-      content,
-      short_description,
-      status,
-      audience
-    )
-    SELECT * FROM UNNEST (
-      $1::text[],
-      $2::text[],
-      $3::text[],
-      $4::text[],
-      $5::text[],
-      $6::text[]
-    )
-    RETURNING id;
-    `,
-      [
-        notificationsToSend.map((r) => r.type),
-        notificationsToSend.map((r) => r.title),
-        notificationsToSend.map((r) => r.content),
-        notificationsToSend.map((r) => r.short_description),
-        notificationsToSend.map((r) => r.status),
-        notificationsToSend.map((r) => r.audience),
-      ],
-    );
-
-    notifications.forEach((n, i) => {
-      n.status = "sent";
-      notificationsStatus[n.id] = {
-        status: res[i] ? "sent" : "error",
-        error: res[i] ? "" : "Failed to insert inbox notification",
-      };
-    });
+    const response = await this.inboxSender.send(notifications);
     return notificationsStatus;
   }
 }

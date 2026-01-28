@@ -17,25 +17,26 @@ export interface NotificationAudience {
 }
 
 export interface DbNotification {
-  id: number; // INTEGER IDENTITY
-  audience: string; // TEXT NOT NULL
-  type: string; // TEXT NOT NULL
-  title: string; // TEXT NOT NULL
-  content: string | null; // TEXT
-  content_type: string | null; // TEXT
-  short_description: string | null; // TEXT
-  template: string | null; // TEXT
-  status: "pending" | "error" | "sent" | 'sending' | "warning" | "userNotFound"; // TEXT NOT NULL (tu enum lógico)
-  send_date: string | null; // DATE
-  creator: string; // TEXT NOT NULL
-  created_at: string; // DATE NOT NULL
+  id: number;
+  audience: string;
+  type: string;
+  title: string;
+  content: string | null;
+  content_type: string | null;
+  short_description: string | null;
+  template: string | null;
+  status: "pending" | "retry" | "error" | "sent" | "sending" | "retrying";
+  error?: string;
+  send_date: string | null;
+  creator: string;
+  created_at: string;
   attemps: number;
 }
 
 export interface DbNotificationState {
   id: number;
   notification_id: number;
-  status: "pending" | "error" | "sent" | "warning";
+  status: "pending" | "error" | "sent" | "retry";
   error: string;
   send_date: Date;
   attemps: number;

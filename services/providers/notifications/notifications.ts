@@ -1,6 +1,7 @@
 import { neonDb } from "../../infrastructure/neon";
 import {
   DbNotification,
+  DbNotificationState,
   InputNotification,
 } from "../../../types/notifications";
 
@@ -16,7 +17,41 @@ export class NotificationsProvider {
     return hackathonsDb;
   }
 
-  public async fetchPendingNotifications() {
+  public async fetchUnsentNotifications() {
+    const notifications = await neonDb.query<DbNotification>(
+      `SELECT *
+      FROM "Notification"
+      WHERE status IN ('pending', 'retry')
+      `,
+    );
+    console.debug(`${notifications.length} fetched notifications`);
+    return notifications;
+  }
+
+  public async fetchRetryNotificationsStates() {
+    const inboxRetryNotificationsStates = await neonDb.query<DbNotificationState>(
+      `SELECT * 
+      FROM "NotificationInboxState" 
+      JOIN "Notification" ON "NotificationInboxState".notification_id = "Notification".id
+      WHERE "Notification".status = 'retry'`,
+    );
+    console.debug(
+      `${inboxRetryNotificationsStates.length} fetched retry inbox notifications states`,
+    );
+    const emailRetryNotificationsStates = await neonDb.query<DbNotificationState>(
+      `SELECT * 
+      FROM "NotificationEmailState" 
+      JOIN "Notification" ON "NotificationEmailState".notification_id = "Notification".id
+      WHERE "Notification".status = 'retry'`,
+    );
+    console.debug(
+      `${emailRetryNotificationsStates.length} fetched retry email notifications states`,
+    );
+
+    return { inboxRetryNotificationsStates, emailRetryNotificationsStates };
+  }
+
+  public async fetch() {
     const notifications = await neonDb.query<DbNotification>(
       `SELECT * FROM "Notification" WHERE status = 'pending' OR status = 'warning`,
     );

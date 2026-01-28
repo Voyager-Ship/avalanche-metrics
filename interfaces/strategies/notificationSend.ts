@@ -5,5 +5,5 @@ import {
 } from "../../types/notifications";
 
 export interface NotificationSendStrategy {
-  send(notifications: DbNotification[]): Promise<{ [key: string]: DbNotificationState }>;
+  send(notifications: DbNotification[], retryNotificationsStates: DbNotificationState[]): Promise<{ [key: string]: DbNotificationState }>;
 }

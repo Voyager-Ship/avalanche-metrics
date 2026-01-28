@@ -87,7 +87,6 @@ export default class NotificationsCreator {
     short_description,
     template,
     status,
-    last_error,
     audience,
     creator,
     created_at
@@ -100,7 +99,6 @@ export default class NotificationsCreator {
     u.short_description,
     u.template,
     u.status,
-    u.last_error,
     u.audience,
     u.creator,
     NOW()
@@ -113,8 +111,7 @@ export default class NotificationsCreator {
     $6::text[],
     $7::text[],
     $8::text[],
-    $9::text[],
-    $10::text[]
+    $9::text[]
   ) AS u(
     type,
     title,
@@ -123,7 +120,6 @@ export default class NotificationsCreator {
     short_description,
     template,
     status,
-    last_error,
     audience,
     creator
   )
@@ -137,7 +133,6 @@ export default class NotificationsCreator {
         notificationsToSend.map((r) => r.short_description),
         notificationsToSend.map((r) => r.template),
         notificationsToSend.map(() => "pending"),
-        notificationsToSend.map(() => ""),
         notificationsToSend.map((r) =>
           this.getNotificationAudience(r, allUsers, hackathonsData),
         ),
