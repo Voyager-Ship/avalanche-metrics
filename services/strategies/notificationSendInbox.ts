@@ -44,8 +44,9 @@ export class NotificationSendInboxStrategy implements NotificationSendStrategy {
       (n) => n.type === "message",
     );
     const courseCompletionNotifications = notificationsToSend.filter(
-      (n) => n.type === "course_completion",
+      (n) => n.type === "courseCompleted",
     );
+    console.log('Course completion notifications: ', courseCompletionNotifications)
 
     const messageNotificationsState = await this.sendMessagesNotifications(
       messageNotifications,

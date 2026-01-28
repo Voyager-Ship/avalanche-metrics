@@ -8,22 +8,25 @@ export default class NotificationsGetter {
     console.debug("Getting notifications for users:", users);
     const notifications = await neonDb.query(
       `
-  SELECT *
-  FROM "NotificationInbox"
-  WHERE audience = ANY($1::text[])
+  SELECT n.*, nis.status AS status, nis.audience AS audience
+  FROM "NotificationInboxState" AS nis
+  JOIN "Notification" AS n
+  ON nis.notification_id = n.id
+  WHERE nis.audience = ANY($1::text[]) AND nis.status IN ('sent', 'read')
   ORDER BY
-    CASE status
+    CASE nis.status
       WHEN 'sent' THEN 0
       WHEN 'read' THEN 1
       ELSE 2
     END
   LIMIT 20
   `,
-      [users]
+      [users],
     );
+
     users.forEach((user) => {
       data[user] = notifications.filter((n) =>
-        n.audience.split(",").includes(user)
+        n.audience.split(",").includes(user),
       );
     });
     return data;

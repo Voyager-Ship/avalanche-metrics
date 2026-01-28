@@ -39,31 +39,6 @@ export default class NotificationsSender {
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
       dbAudience.forEach((u, i) => {
         if (u) {
-          // No sent
-          // if (
-          //   inboxSentNotificationsStates.some(
-          //     (isns) =>
-          //       (isns.notification_id === n.id && isns.audience === u.id) ||
-          //       isns.audience === u.email,
-          //   ) ||
-          //   emailSentNotificationsStates.some(
-          //     (isns) =>
-          //       (isns.notification_id === n.id && isns.audience === u.id) ||
-          //       isns.audience === u.email,
-          //   ) ||
-          //   inboxErrorNotificationsStates.some(
-          //     (isns) =>
-          //       (isns.notification_id === n.id && isns.audience === u.id) ||
-          //       isns.audience === u.email,
-          //   ) ||
-          //   emailErrorNotificationsStates.some(
-          //     (isns) =>
-          //       (isns.notification_id === n.id && isns.audience === u.id) ||
-          //       isns.audience === u.email,
-          //   )
-          // ) {
-          //   return;
-          // }
           let added = false;
           if (
             u.notification_means &&
@@ -152,18 +127,28 @@ export default class NotificationsSender {
       inboxRetryNotificationsStates,
     );
 
+    console.log("EmailNotificationStatus: ", emailNotificationsStatus);
+    console.log("InboxNotificationStatus: ", inboxNotificationsStatus);
+
     notifications.forEach((n) => {
+      n.status = "error";
       if (
-        emailNotificationsStatus[n.id]?.status == "retry" ||
-        inboxNotificationsStatus[n.id]?.status == "retry"
+        inboxNotificationsStatus[n.id]?.status == "sent" &&
+        emailNotificationsStatus[n.id]?.status == "sent"
       ) {
+        n.status = "sent";
+      }
+      if (inboxNotificationsStatus[n.id]?.status == "retry") {
         n.status = "retry";
       }
-      if (
-        emailNotificationsStatus[n.id]?.status == "error" &&
-        inboxNotificationsStatus[n.id]?.status == "error"
-      ) {
-        n.status = "error";
+      if (emailNotificationsStatus[n.id]?.status == "retry") {
+        n.status = "retry";
+      }
+      if (emailNotificationsStatus[n.id]?.status == "error") {
+        n.status = n.status == "retry" ? "retry" : "error";
+      }
+      if (emailNotificationsStatus[n.id]?.status == "error") {
+        n.status = n.status == "retry" ? "retry" : "error";
       }
     });
 

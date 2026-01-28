@@ -30,7 +30,7 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
       (n) => n.type === "message",
     );
     const courseCompletionNotifications = notificationsToSend.filter(
-      (n) => n.type === "course_completion",
+      (n) => n.type === "courseCompleted",
     );
 
     const messageNotificationsState = await this.sendMessagesNotifications(
@@ -252,7 +252,6 @@ RETURNING nes.notification_id;
       });
     } else {
       notifications.forEach((n) => {
-        console.log('RETRYY: ', retryNotificationsStates)
         const currentAttemps = retryNotificationsStates.find(
           (rn) => rn.notification_id == n.id && rn.audience == n.audience,
         )?.attemps;

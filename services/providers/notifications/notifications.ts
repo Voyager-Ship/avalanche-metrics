@@ -50,8 +50,6 @@ export class NotificationsProvider {
       `${emailRetryNotificationsStates.length} fetched retry email notifications states`,
     );
 
-    console.log('RETRYDATA: ', {inboxRetryNotificationsStates, emailRetryNotificationsStates})
-
     return { inboxRetryNotificationsStates, emailRetryNotificationsStates };
   }
 
