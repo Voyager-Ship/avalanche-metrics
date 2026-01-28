@@ -9,7 +9,7 @@ export class NotificationsProvider {
   constructor() {}
 
   public async fetchHackathons(hackathons: string[]) {
-    const hackathonsDb = await neonDb.query<{ id: string; admins: string }>(
+    const hackathonsDb = await neonDb.query<{ id: string; cohosts: string[] }>(
       `SELECT * FROM "Hackathon" WHERE id LIKE ANY($1)`,
       [hackathons],
     );

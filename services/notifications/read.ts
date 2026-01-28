@@ -8,9 +8,9 @@ export default class NotificationsReader {
 
     await neonDb.query(
       `
-      UPDATE "NotificationInbox" AS n
+      UPDATE "NotificationInboxState" AS n
       SET status = 'read'
-      WHERE n.id = ANY($1::int[])
+      WHERE n.notification_id = ANY($1::int[])
         AND n.audience = $2;
       `,
       [notification, userId]

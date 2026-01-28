@@ -45,8 +45,8 @@ export default class NotificationsCreator {
                   hackathonsDB.some(
                     (hDB) =>
                       hDB.id == h &&
-                      (hDB.admins.includes(authUserDB[0].id) ||
-                        hDB.admins.includes(authUserDB[0].email)),
+                      (hDB.cohosts.includes(authUserDB[0].id) ||
+                        hDB.cohosts.includes(authUserDB[0].email)),
                   ),
                 )
               : [],
