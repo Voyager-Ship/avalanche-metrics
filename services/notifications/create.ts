@@ -75,7 +75,6 @@ export default class NotificationsCreator {
           notificationsToSend,
         );
     }
-    console.log('Notifications to send: ', notificationsToSend);
 
     await neonDb.query(
       `

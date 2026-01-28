@@ -29,26 +29,84 @@ export class NotificationsProvider {
   }
 
   public async fetchRetryNotificationsStates() {
-    const inboxRetryNotificationsStates = await neonDb.query<DbNotificationState>(
-      `SELECT nis.*
+    const inboxRetryNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nis.*
       FROM "NotificationInboxState" AS nis
       JOIN "Notification" AS n ON nis.notification_id = n.id
-      WHERE n.status = 'retry'`,
-    );
+      WHERE nis.status = 'retry'`,
+      );
     console.debug(
       `${inboxRetryNotificationsStates.length} fetched retry inbox notifications states`,
     );
-    const emailRetryNotificationsStates = await neonDb.query<DbNotificationState>(
-      `SELECT nes.* 
+    const emailRetryNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nes.* 
       FROM "NotificationEmailState" AS nes
       JOIN "Notification" AS n ON nes.notification_id = n.id
-      WHERE n.status = 'retry'`,
-    );
+      WHERE nes.status = 'retry'`,
+      );
     console.debug(
       `${emailRetryNotificationsStates.length} fetched retry email notifications states`,
     );
 
+    console.log('RETRYDATA: ', {inboxRetryNotificationsStates, emailRetryNotificationsStates})
+
     return { inboxRetryNotificationsStates, emailRetryNotificationsStates };
+  }
+
+  public async fetchSentNotificationsStates(notifications: DbNotification[]) {
+    const inboxSentNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nis.*
+      FROM "NotificationInboxState" AS nis
+      JOIN "Notification" AS n ON nis.notification_id = n.id
+      WHERE nis.status = 'sent' AND nis.notification_id = ANY($1::int[])`,
+        [notifications.map((n) => n.id)],
+      );
+    console.debug(
+      `${inboxSentNotificationsStates.length} fetched sent inbox notifications states`,
+    );
+    const emailSentNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nes.* 
+      FROM "NotificationEmailState" AS nes
+      JOIN "Notification" AS n ON nes.notification_id = n.id
+      WHERE nes.status = 'sent' AND nes.notification_id = ANY($1::int[])`,
+        [notifications.map((n) => n.id)],
+      );
+    console.debug(
+      `${emailSentNotificationsStates.length} fetched sent email notifications states`,
+    );
+
+    return { inboxSentNotificationsStates, emailSentNotificationsStates };
+  }
+
+  public async fetchErrorNotificationsStates(notifications: DbNotification[]) {
+    const inboxErrorNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nis.*
+      FROM "NotificationInboxState" AS nis
+      JOIN "Notification" AS n ON nis.notification_id = n.id
+      WHERE nis.status = 'error' AND nis.notification_id = ANY($1::int[])`,
+        [notifications.map((n) => n.id)],
+      );
+    console.debug(
+      `${inboxErrorNotificationsStates.length} fetched sent inbox notifications states`,
+    );
+    const emailErrorNotificationsStates =
+      await neonDb.query<DbNotificationState>(
+        `SELECT nes.* 
+      FROM "NotificationEmailState" AS nes
+      JOIN "Notification" AS n ON nes.notification_id = n.id
+      WHERE nes.status = 'error' AND nes.notification_id = ANY($1::int[])`,
+        [notifications.map((n) => n.id)],
+      );
+    console.debug(
+      `${emailErrorNotificationsStates.length} fetched sent email notifications states`,
+    );
+
+    return { inboxErrorNotificationsStates, emailErrorNotificationsStates };
   }
 
   public async fetch() {

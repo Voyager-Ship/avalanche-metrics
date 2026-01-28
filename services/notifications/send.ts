@@ -18,6 +18,15 @@ export default class NotificationsSender {
     const { inboxRetryNotificationsStates, emailRetryNotificationsStates } =
       await this.notificationsProvider.fetchRetryNotificationsStates();
 
+    const { inboxSentNotificationsStates, emailSentNotificationsStates } =
+      await this.notificationsProvider.fetchSentNotificationsStates(
+        notifications,
+      );
+    const { inboxErrorNotificationsStates, emailErrorNotificationsStates } =
+      await this.notificationsProvider.fetchErrorNotificationsStates(
+        notifications,
+      );
+
     const users = notifications.flatMap((n) => n.audience.split(","));
     const dbUsers = await this.notificationsProvider.fetchUsers(users);
 
@@ -30,30 +39,85 @@ export default class NotificationsSender {
         .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
       dbAudience.forEach((u, i) => {
         if (u) {
+          // No sent
+          // if (
+          //   inboxSentNotificationsStates.some(
+          //     (isns) =>
+          //       (isns.notification_id === n.id && isns.audience === u.id) ||
+          //       isns.audience === u.email,
+          //   ) ||
+          //   emailSentNotificationsStates.some(
+          //     (isns) =>
+          //       (isns.notification_id === n.id && isns.audience === u.id) ||
+          //       isns.audience === u.email,
+          //   ) ||
+          //   inboxErrorNotificationsStates.some(
+          //     (isns) =>
+          //       (isns.notification_id === n.id && isns.audience === u.id) ||
+          //       isns.audience === u.email,
+          //   ) ||
+          //   emailErrorNotificationsStates.some(
+          //     (isns) =>
+          //       (isns.notification_id === n.id && isns.audience === u.id) ||
+          //       isns.audience === u.email,
+          //   )
+          // ) {
+          //   return;
+          // }
           let added = false;
           if (
             u.notification_means &&
             u.notification_means[n.type] &&
             u.notification_means[n.type][0]
           ) {
-            inboxNotificationsToSend.push({
-              ...n,
-              audience: u.id,
-              status: n.status == "pending" ? "sending" : "retrying",
-            });
-            added = true;
+            if (
+              inboxSentNotificationsStates.some(
+                (isns) =>
+                  (isns.notification_id === n.id && isns.audience === u.id) ||
+                  isns.audience === u.email,
+              ) ||
+              inboxErrorNotificationsStates.some(
+                (isns) =>
+                  (isns.notification_id === n.id && isns.audience === u.id) ||
+                  isns.audience === u.email,
+              )
+            ) {
+              added = true;
+            } else {
+              inboxNotificationsToSend.push({
+                ...n,
+                audience: u.id,
+                status: n.status == "pending" ? "sending" : "retrying",
+              });
+              added = true;
+            }
           }
           if (
             u.notification_means &&
             u.notification_means[n.type] &&
             u.notification_means[n.type][1]
           ) {
-            emailNotificationsToSend.push({
-              ...n,
-              audience: u.email,
-              status: n.status == "pending" ? "sending" : "retrying",
-            });
-            added = true;
+            if (
+              emailSentNotificationsStates.some(
+                (isns) =>
+                  (isns.notification_id === n.id && isns.audience === u.id) ||
+                  isns.audience === u.email,
+              ) ||
+              emailErrorNotificationsStates.some(
+                (isns) =>
+                  (isns.notification_id === n.id && isns.audience === u.id) ||
+                  isns.audience === u.email,
+              )
+            ) {
+              added = true;
+            } else {
+              emailNotificationsToSend.push({
+                ...n,
+                audience: u.email,
+                status: n.status == "pending" ? "sending" : "retrying",
+              });
+              added = true;
+            }
           }
           if (added) {
             n.status = n.status === "pending" ? "sending" : "retrying";
@@ -61,24 +125,22 @@ export default class NotificationsSender {
             inboxNotificationsToSend.push({
               ...n,
               audience: u.id,
-              status: "error",
+              status: "retry",
               error: "No notification means enabled",
             });
+            n.status = "retry";
           }
         } else {
           inboxNotificationsToSend.push({
             ...n,
             audience: n.audience.split(",")[i],
-            status: "error",
+            status: "retry",
             error: "User not found",
           });
           n.status = "retry";
         }
       });
     });
-    console.log("Notifications: ", notifications);
-    console.log("Inbox notifications to send: ", inboxNotificationsToSend);
-    console.log("Email notifications to send: ", emailNotificationsToSend);
 
     const emailNotificationsStatus = await this.emailSender.send(
       emailNotificationsToSend,
@@ -91,10 +153,16 @@ export default class NotificationsSender {
     );
 
     notifications.forEach((n) => {
-      if (emailNotificationsStatus[n.id]?.status == "retry" || inboxNotificationsStatus[n.id]?.status == "retry") {
+      if (
+        emailNotificationsStatus[n.id]?.status == "retry" ||
+        inboxNotificationsStatus[n.id]?.status == "retry"
+      ) {
         n.status = "retry";
       }
-      if (emailNotificationsStatus[n.id]?.status == "error" && inboxNotificationsStatus[n.id]?.status == "error") {
+      if (
+        emailNotificationsStatus[n.id]?.status == "error" &&
+        inboxNotificationsStatus[n.id]?.status == "error"
+      ) {
         n.status = "error";
       }
     });
@@ -111,10 +179,7 @@ export default class NotificationsSender {
         ) AS u
         WHERE n.id = u.id;
         `,
-        [
-          notifications.map((n) => n.id),
-          notifications.map((n) => n.status),
-        ],
+        [notifications.map((n) => n.id), notifications.map((n) => n.status)],
       );
     }
     return notifications;

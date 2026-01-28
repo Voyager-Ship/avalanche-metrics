@@ -200,7 +200,7 @@ RETURNING nes.notification_id;
         });
       });
     } else {
-      notifications.forEach((n, i) => {
+      notifications.forEach((n) => {
         const currentAttemps = retryNotificationsStates.find(
           (rn) => rn.notification_id == n.id && rn.audience == n.audience,
         )?.attemps;
@@ -251,7 +251,8 @@ RETURNING nes.notification_id;
         });
       });
     } else {
-      notifications.forEach((n, i) => {
+      notifications.forEach((n) => {
+        console.log('RETRYY: ', retryNotificationsStates)
         const currentAttemps = retryNotificationsStates.find(
           (rn) => rn.notification_id == n.id && rn.audience == n.audience,
         )?.attemps;

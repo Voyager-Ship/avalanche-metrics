@@ -1,7 +1,6 @@
 import { DbNotification, DbNotificationState } from "../../types/notifications";
 import { NotificationSendStrategy } from "../../interfaces/strategies/notificationSend";
 import { neonDb } from "../infrastructure/neon";
-import axios from "axios";
 
 export class NotificationSendInboxStrategy implements NotificationSendStrategy {
   public async send(
@@ -10,6 +9,21 @@ export class NotificationSendInboxStrategy implements NotificationSendStrategy {
   ): Promise<{ [key: string]: DbNotificationState }> {
     const notificationsState: DbNotificationState[] = [];
     notifications.forEach((n) => {
+      if (n.status == "retry") {
+        const currentAttemp = retryNotificationsStates.find(
+          (rns) => rns.notification_id == n.id && rns.audience == n.audience,
+        )?.attemps;
+
+        notificationsState.push({
+          id: n.id,
+          notification_id: n.id,
+          status: currentAttemp && currentAttemp >= 2 ? "error" : "retry",
+          error: n.error || "Unknown error",
+          send_date: new Date(),
+          attemps: currentAttemp ? currentAttemp + 1 : 1,
+          audience: n.audience,
+        });
+      }
       if (n.status == "error") {
         notificationsState.push({
           id: n.id,
@@ -49,17 +63,16 @@ export class NotificationSendInboxStrategy implements NotificationSendStrategy {
     const newNotifications = notifications.filter(
       (n) =>
         n.status === "sending" ||
-        n.status === "retry" ||
-        (n.status === "retrying" &&
+        ((n.status === "retrying" || n.status === "retry") &&
           !retryNotificationsStates.some((rn) => rn.notification_id === n.id)),
     );
 
     const notificationsToUpdate = notifications.filter(
       (n) =>
-        n.status === "retrying" &&
+        (n.status === "retrying" || n.status === "retry") &&
         retryNotificationsStates.some((rn) => rn.notification_id === n.id),
     );
-
+    console.log("Notifications state: ", notificationsState);
     await neonDb.query<{ id: number }>(
       `
     INSERT INTO "NotificationInboxState" (
@@ -186,13 +199,12 @@ RETURNING nis.notification_id;
       notificationsStatus.push({
         id: id ?? 0,
         notification_id: n.id,
-        status: 'sent',
-        error: '',
+        status: "sent",
+        error: "",
         send_date: new Date(),
         attemps: currentAttemps ? currentAttemps + 1 : 1,
         audience: n.audience,
       });
-
     });
     return notificationsStatus;
   }
@@ -213,13 +225,13 @@ RETURNING nis.notification_id;
       notificationsStatus.push({
         id: id ?? 0,
         notification_id: n.id,
-        status: n.content_type === 'application/json' ? 'sent' : 'error',
-        error: n.content_type === 'application/json' ? '' : 'Invalid content type',
+        status: n.content_type === "application/json" ? "sent" : "error",
+        error:
+          n.content_type === "application/json" ? "" : "Invalid content type",
         send_date: new Date(),
         attemps: currentAttemps ? currentAttemps + 1 : 1,
         audience: n.audience,
       });
-
     });
     return notificationsStatus;
   }

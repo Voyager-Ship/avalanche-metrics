@@ -24,7 +24,6 @@ export function startSendNotificationsWorker(config: WorkerConfig): void {
 
   const tick = async (): Promise<void> => {
     try {
-      console.log('Sending')
       const response: AxiosResponse = await axios.post(
         config.endpointUrl,
         {
