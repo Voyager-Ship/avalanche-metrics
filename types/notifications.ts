@@ -36,7 +36,7 @@ export interface DbNotification {
 export interface DbNotificationState {
   id: number;
   notification_id: number;
-  status: "pending" | "error" | "sent" | "retry";
+  status: "pending" | "error" | "sent" | "retry" | "sending" | "retrying";
   error: string;
   send_date: Date;
   attemps: number;

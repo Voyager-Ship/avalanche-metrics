@@ -8,12 +8,12 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
     notifications: DbNotification[],
     retryNotificationsStates: DbNotificationState[],
   ): Promise<{ [key: string]: DbNotificationState }> {
-    const notificationsState: { [key: string]: DbNotificationState } = {};
+    const notificationsState: DbNotificationState[] = [];
     console.log("CURRENT NOTIFICATIONS: ", notifications);
     console.log("RETRY NOTIFICATIONS STATES: ", retryNotificationsStates);
     notifications.forEach((n) => {
       if (n.status == "error") {
-        notificationsState[n.id] = {
+        notificationsState.push({
           id: n.id,
           notification_id: n.id,
           status: "error",
@@ -21,7 +21,7 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
           send_date: new Date(),
           attemps: n.attemps ? n.attemps + 1 : 1,
           audience: n.audience,
-        };
+        });
       }
     });
     const notificationsToSend = notifications.filter(
@@ -39,26 +39,13 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
       messageNotifications,
       retryNotificationsStates,
     );
+    notificationsState.push(...messageNotificationsState);
 
-    const courseCompletionNotificationsState =
-      await this.sendCourseCompletionNotifications(
-        courseCompletionNotifications,
-        retryNotificationsStates,
-      );
-
-    notifications.forEach((n) => {
-      switch (n.type) {
-        case "message":
-          notificationsState[n.id] = messageNotificationsState[n.id];
-          break;
-        case "course_completion":
-          notificationsState[n.id] = courseCompletionNotificationsState[n.id];
-          break;
-        default:
-          notificationsState[n.id] = this.buildUnknown(n);
-          break;
-      }
-    });
+    // const courseCompletionNotificationsState =
+    //   await this.sendCourseCompletionNotifications(
+    //     courseCompletionNotifications,
+    //     retryNotificationsStates,
+    //   );
 
     const newNotifications = notifications.filter(
       (n) =>
@@ -70,9 +57,8 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
 
     const notificationsToUpdate = notifications.filter(
       (n) =>
-        n.status === "retrying" ||
-        (n.status === "error" &&
-          retryNotificationsStates.some((rn) => rn.notification_id === n.id)),
+        n.status === "retrying" &&
+        retryNotificationsStates.some((rn) => rn.notification_id === n.id),
     );
 
     await neonDb.query<{ id: number }>(
@@ -97,16 +83,54 @@ export class NotificationSendEmailStrategy implements NotificationSendStrategy {
     `,
       [
         newNotifications.map((r) => r.id),
-        newNotifications.map((r) => notificationsState[r.id].status),
-        newNotifications.map((r) => notificationsState[r.id].error),
-        newNotifications.map((r) => notificationsState[r.id].send_date),
-        newNotifications.map((r) => notificationsState[r.id].attemps),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.status,
+        ),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.error,
+        ),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id == r.id && ns.audience === r.audience,
+            )?.send_date,
+        ),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.attemps,
+        ),
         newNotifications.map((r) => r.audience),
       ],
     );
+    notificationsToUpdate.forEach((n) => {
+      const base_notification_id = n.id
+      n.id =
+        retryNotificationsStates.find(
+          (rn) => rn.notification_id === base_notification_id && rn.audience === n.audience,
+        )?.id || 0;
+      n.status =
+        notificationsState.find(
+          (ns) => ns.notification_id === base_notification_id && ns.audience === n.audience,
+        )?.status ?? "error";
+      n.error = notificationsState.find(
+        (ns) => ns.notification_id === base_notification_id && ns.audience === n.audience,
+      )?.error;
+      n.attemps =
+        notificationsState.find(
+          (ns) => ns.notification_id === base_notification_id && ns.audience === n.audience,
+        )?.attemps ?? 1;
+    });
 
-    console.log("NOTIFICATIONS TO UPDATE: ", notificationsToUpdate);
-    console.log("Notificat: ", notificationsToUpdate);
+    console.log("Notifications states: ", notificationsState);
+    console.log("Notifications to update: ", notificationsToUpdate);
 
     await neonDb.query<{ id: number }>(
       `
@@ -124,27 +148,38 @@ FROM (
     UNNEST($4::text[]) AS send_date,
     UNNEST($5::int[])  AS attemps
 ) AS u
-WHERE nes.notification_id = u.id
+WHERE nes.id = u.id
 RETURNING nes.notification_id;
 
     `,
       [
         notificationsToUpdate.map((r) => r.id),
-        notificationsToUpdate.map((r) => notificationsState[r.id].status),
-        notificationsToUpdate.map((r) => notificationsState[r.id].error),
-        notificationsToUpdate.map((r) => notificationsState[r.id].send_date),
-        notificationsToUpdate.map((r) => notificationsState[r.id].attemps),
+        notificationsToUpdate.map((r) => r.status),
+        notificationsToUpdate.map((r) => r.error),
+        notificationsToUpdate.map(() => new Date()),
+        notificationsToUpdate.map((r) => r.attemps),
       ],
     );
-
-    return notificationsState;
+    const notificationsStateMap: { [key: string]: DbNotificationState } = {};
+    notificationsState.forEach((ns) => {
+      const status = notificationsStateMap[ns.notification_id]?.status;
+      if (ns.status == "error") {
+        notificationsStateMap[ns.notification_id] = ns;
+      } else if (
+        ns.status == "retry" &&
+        notificationsStateMap[ns.notification_id]?.status !== "error"
+      ) {
+        notificationsStateMap[ns.notification_id] = ns;
+      }
+    });
+    return notificationsStateMap;
   }
 
   private async sendMessagesNotifications(
     notifications: DbNotification[],
     retryNotificationsStates: DbNotificationState[],
-  ): Promise<{ [key: string]: DbNotificationState }> {
-    const notificationsStatus: { [key: string]: DbNotificationState } = {};
+  ): Promise<DbNotificationState[]> {
+    const notificationsStatus: DbNotificationState[] = [];
     if (process.env.HUBSPOT_WEBHOOK) {
       const response: { [key: string]: DbNotificationState } = await axios.post(
         process.env.HUBSPOT_WEBHOOK,
@@ -154,80 +189,86 @@ RETURNING nes.notification_id;
       );
       notifications.forEach((n) => {
         const currentAttemps = retryNotificationsStates.find(
-          (rn) => rn.notification_id === n.id,
+          (rn) => rn.notification_id == n.id && rn.audience == n.audience,
         )?.attemps;
-        notificationsStatus[n.id] = {
-          id: 0,
+        const id = retryNotificationsStates.find(
+          (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+        )?.id;
+        notificationsStatus.push({
+          id: id ?? 0,
           notification_id: n.id,
           status: response[n.id].status,
           error: response[n.id].error,
           send_date: new Date(),
           attemps: currentAttemps ? currentAttemps + 1 : 1,
           audience: n.audience,
-        };
+        });
       });
     } else {
-      notifications.forEach((n) => {
+      notifications.forEach((n, i) => {
         const currentAttemps = retryNotificationsStates.find(
-          (rn) => rn.notification_id === n.id,
+          (rn) => rn.notification_id == n.id && rn.audience == n.audience,
         )?.attemps;
-        notificationsStatus[n.id] = {
-          id: 0,
+        const id = retryNotificationsStates.find(
+          (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+        )?.id;
+        notificationsStatus.push({
+          id: id ?? 0,
           notification_id: n.id,
           status: currentAttemps && currentAttemps >= 2 ? "error" : "retry",
           error: "Hubspot webhook not configured",
           send_date: new Date(),
           attemps: currentAttemps ? currentAttemps + 1 : 1,
           audience: n.audience,
-        };
+        });
       });
     }
     return notificationsStatus;
   }
 
-  private async sendCourseCompletionNotifications(
-    notifications: DbNotification[],
-    retryNotificationsStates: DbNotificationState[],
-  ): Promise<{ [key: string]: DbNotificationState }> {
-    const notificationsStatus: { [key: string]: DbNotificationState } = {};
-    if (process.env.HUBSPOT_WEBHOOK) {
-      const response: { [key: string]: DbNotificationState } = await axios.post(
-        process.env.HUBSPOT_WEBHOOK,
-        {
-          notifications: notifications,
-        },
-      );
-      notifications.forEach((n) => {
-        notificationsStatus[n.id] = {
-          id: 0,
-          notification_id: n.id,
-          status:
-            response[n.id].status == "error"
-              ? n.attemps >= 2
-                ? "error"
-                : "retry"
-              : response[n.id].status,
-          error: response[n.id].error,
-          send_date: new Date(),
-          attemps: n.attemps ? n.attemps + 1 : 1,
-          audience: n.audience,
-        };
-      });
-    } else {
-      notifications.forEach((n) => {
-        notificationsStatus[n.id] = {
-          id: 0,
-          notification_id: n.id,
-          status: n.attemps >= 2 ? "error" : "retry",
-          error: "Hubspot webhook not configured",
-          send_date: new Date(),
-          attemps: n.attemps ? n.attemps + 1 : 1,
-          audience: n.audience,
-        };
-      });
-    }
-    return notificationsStatus;
-  }
+  // private async sendCourseCompletionNotifications(
+  //   notifications: DbNotification[],
+  //   retryNotificationsStates: DbNotificationState[],
+  // ): Promise<DbNotificationState[]> {
+  //   const notificationsStatus: DbNotificationState[] = [];
+  //   if (process.env.HUBSPOT_WEBHOOK) {
+  //     const response: { [key: string]: DbNotificationState } = await axios.post(
+  //       process.env.HUBSPOT_WEBHOOK,
+  //       {
+  //         notifications: notifications,
+  //       },
+  //     );
+  //     notifications.forEach((n) => {
+  //       notificationsStatus.push({
+  //         id: 0,
+  //         notification_id: n.id,
+  //         status:
+  //           response[n.id].status == "error"
+  //             ? n.attemps >= 2
+  //               ? "error"
+  //               : "retry"
+  //             : response[n.id].status,
+  //         error: response[n.id].error,
+  //         send_date: new Date(),
+  //         attemps: n.attemps ? n.attemps + 1 : 1,
+  //         audience: n.audience,
+  //       });
+  //     });
+  //   } else {
+  //     notifications.forEach((n) => {
+  //       notificationsStatus.push({
+  //         id: 0,
+  //         notification_id: n.id,
+  //         status: n.attemps >= 2 ? "error" : "retry",
+  //         error: "Hubspot webhook not configured",
+  //         send_date: new Date(),
+  //         attemps: n.attemps ? n.attemps + 1 : 1,
+  //         audience: n.audience,
+  //       });
+  //     });
+  //   }
+  //   return notificationsStatus;
+  // }
 
   private buildUnknown(notification: DbNotification): DbNotificationState {
     return {

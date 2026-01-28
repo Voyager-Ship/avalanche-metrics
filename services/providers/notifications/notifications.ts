@@ -30,19 +30,19 @@ export class NotificationsProvider {
 
   public async fetchRetryNotificationsStates() {
     const inboxRetryNotificationsStates = await neonDb.query<DbNotificationState>(
-      `SELECT * 
-      FROM "NotificationInboxState" 
-      JOIN "Notification" ON "NotificationInboxState".notification_id = "Notification".id
-      WHERE "Notification".status = 'retry'`,
+      `SELECT nis.*
+      FROM "NotificationInboxState" AS nis
+      JOIN "Notification" AS n ON nis.notification_id = n.id
+      WHERE n.status = 'retry'`,
     );
     console.debug(
       `${inboxRetryNotificationsStates.length} fetched retry inbox notifications states`,
     );
     const emailRetryNotificationsStates = await neonDb.query<DbNotificationState>(
-      `SELECT * 
-      FROM "NotificationEmailState" 
-      JOIN "Notification" ON "NotificationEmailState".notification_id = "Notification".id
-      WHERE "Notification".status = 'retry'`,
+      `SELECT nes.* 
+      FROM "NotificationEmailState" AS nes
+      JOIN "Notification" AS n ON nes.notification_id = n.id
+      WHERE n.status = 'retry'`,
     );
     console.debug(
       `${emailRetryNotificationsStates.length} fetched retry email notifications states`,

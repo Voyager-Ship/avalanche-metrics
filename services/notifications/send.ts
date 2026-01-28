@@ -91,10 +91,10 @@ export default class NotificationsSender {
     // );
 
     notifications.forEach((n) => {
-      if (emailNotificationsStatus[n.id].status == 'retry') {
+      if (emailNotificationsStatus[n.id]?.status == "retry") {
         n.status = "retry";
       }
-      if (emailNotificationsStatus[n.id].status == 'error') {
+      if (emailNotificationsStatus[n.id]?.status == "error") {
         n.status = "error";
       }
     });
@@ -113,15 +113,7 @@ export default class NotificationsSender {
         `,
         [
           notifications.map((n) => n.id),
-          notifications.map((n) => {
-            let status = "sent";
-            console.log(
-              "EMAIL STATUS: ",
-              emailNotificationsStatus[n.id]?.status,
-            );
-            status = emailNotificationsStatus[n.id]?.status || status;
-            return status;
-          }),
+          notifications.map((n) => n.status),
         ],
       );
     }
