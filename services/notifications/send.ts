@@ -84,17 +84,17 @@ export default class NotificationsSender {
       emailNotificationsToSend,
       emailRetryNotificationsStates,
     );
-    console.log("Email notifications status: ", emailNotificationsStatus);
 
-    // const inboxNotificationsStatus = await this.sendInboxNotifications(
-    //   inboxNotificationsToSend,
-    // );
+    const inboxNotificationsStatus = await this.inboxSender.send(
+      inboxNotificationsToSend,
+      inboxRetryNotificationsStates,
+    );
 
     notifications.forEach((n) => {
-      if (emailNotificationsStatus[n.id]?.status == "retry") {
+      if (emailNotificationsStatus[n.id]?.status == "retry" || inboxNotificationsStatus[n.id]?.status == "retry") {
         n.status = "retry";
       }
-      if (emailNotificationsStatus[n.id]?.status == "error") {
+      if (emailNotificationsStatus[n.id]?.status == "error" && inboxNotificationsStatus[n.id]?.status == "error") {
         n.status = "error";
       }
     });
@@ -118,13 +118,5 @@ export default class NotificationsSender {
       );
     }
     return notifications;
-  }
-
-  private async sendInboxNotifications(notifications: DbNotification[]) {
-    const notificationsStatus: {
-      [key: string]: { status: string; error: string };
-    } = {};
-    const response = await this.inboxSender.send(notifications);
-    return notificationsStatus;
   }
 }

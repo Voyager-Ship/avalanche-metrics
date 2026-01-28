@@ -1,44 +1,68 @@
 import { DbNotification, DbNotificationState } from "../../types/notifications";
 import { NotificationSendStrategy } from "../../interfaces/strategies/notificationSend";
 import { neonDb } from "../infrastructure/neon";
+import axios from "axios";
 
 export class NotificationSendInboxStrategy implements NotificationSendStrategy {
   public async send(
     notifications: DbNotification[],
+    retryNotificationsStates: DbNotificationState[],
   ): Promise<{ [key: string]: DbNotificationState }> {
-    const notificationsState: { [key: string]: DbNotificationState } = {};
+    const notificationsState: DbNotificationState[] = [];
+    notifications.forEach((n) => {
+      if (n.status == "error") {
+        notificationsState.push({
+          id: n.id,
+          notification_id: n.id,
+          status: "error",
+          error: n.error || "Unknown error",
+          send_date: new Date(),
+          attemps: n.attemps ? n.attemps + 1 : 1,
+          audience: n.audience,
+        });
+      }
+    });
+    const notificationsToSend = notifications.filter(
+      (n) => n.status === "sending" || n.status === "retrying",
+    );
 
-    const messageNotifications = notifications.filter(
+    const messageNotifications = notificationsToSend.filter(
       (n) => n.type === "message",
     );
-    const courseCompletionNotifications = notifications.filter(
+    const courseCompletionNotifications = notificationsToSend.filter(
       (n) => n.type === "course_completion",
     );
 
-    const messageNotificationsState =
-      await this.sendMessagesNotifications(messageNotifications);
+    const messageNotificationsState = await this.sendMessagesNotifications(
+      messageNotifications,
+      retryNotificationsStates,
+    );
+    notificationsState.push(...messageNotificationsState);
+
     const courseCompletionNotificationsState =
       await this.sendCourseCompletionNotifications(
         courseCompletionNotifications,
+        retryNotificationsStates,
       );
+    notificationsState.push(...courseCompletionNotificationsState);
 
-    notifications.forEach((n) => {
-      switch (n.type) {
-        case "message":
-          notificationsState[n.id] = messageNotificationsState[n.id];
-          break;
-        case "course_completion":
-          notificationsState[n.id] = courseCompletionNotificationsState[n.id];
-          break;
-        default:
-          notificationsState[n.id] = this.buildUnknown(n);
-          break;
-      }
-    });
+    const newNotifications = notifications.filter(
+      (n) =>
+        n.status === "sending" ||
+        n.status === "retry" ||
+        (n.status === "retrying" &&
+          !retryNotificationsStates.some((rn) => rn.notification_id === n.id)),
+    );
+
+    const notificationsToUpdate = notifications.filter(
+      (n) =>
+        n.status === "retrying" &&
+        retryNotificationsStates.some((rn) => rn.notification_id === n.id),
+    );
 
     await neonDb.query<{ id: number }>(
       `
-    INSERT INTO "NotificationInbox" (
+    INSERT INTO "NotificationInboxState" (
       notification_id,
       status,
       error,
@@ -50,42 +74,153 @@ export class NotificationSendInboxStrategy implements NotificationSendStrategy {
       $1::integer[],
       $2::text[],
       $3::text[],
+      $4::date[],
+      $5::integer[],
+      $6::text[]
     )
     RETURNING id;
     `,
       [
-        notifications.map((r) => r.id),
-        notifications.map((r) => notificationsState[r.id].status),
-        notifications.map((r) => notificationsState[r.id].error),
-        notifications.map((r) => notificationsState[r.id].send_date),
-        notifications.map((r) => notificationsState[r.id].attemps),
-        notifications.map((r) => notificationsState[r.id].audience),
+        newNotifications.map((r) => r.id),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.status,
+        ),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.error,
+        ),
+        newNotifications.map(() => new Date()),
+        newNotifications.map(
+          (r) =>
+            notificationsState.find(
+              (ns) => ns.notification_id === r.id && ns.audience === r.audience,
+            )?.attemps,
+        ),
+        newNotifications.map((r) => r.audience),
       ],
     );
-    return notificationsState;
+    notificationsToUpdate.forEach((n) => {
+      const base_notification_id = n.id;
+      n.id =
+        retryNotificationsStates.find(
+          (rn) =>
+            rn.notification_id === base_notification_id &&
+            rn.audience === n.audience,
+        )?.id || 0;
+      n.status =
+        notificationsState.find(
+          (ns) =>
+            ns.notification_id === base_notification_id &&
+            ns.audience === n.audience,
+        )?.status ?? "error";
+      n.error = notificationsState.find(
+        (ns) =>
+          ns.notification_id === base_notification_id &&
+          ns.audience === n.audience,
+      )?.error;
+      n.attemps =
+        notificationsState.find(
+          (ns) =>
+            ns.notification_id === base_notification_id &&
+            ns.audience === n.audience,
+        )?.attemps ?? 1;
+    });
+
+    await neonDb.query<{ id: number }>(
+      `
+      UPDATE "NotificationInboxState" AS nis 
+SET 
+  status    = u.status,
+  error     = u.error,
+  send_date = u.send_date,
+  attemps   = u.attemps
+FROM (
+  SELECT 
+    UNNEST($1::int[])  AS id,
+    UNNEST($2::text[]) AS status,
+    UNNEST($3::text[]) AS error,
+    UNNEST($4::date[]) AS send_date,
+    UNNEST($5::int[])  AS attemps
+) AS u
+WHERE nis.id = u.id
+RETURNING nis.notification_id;
+
+    `,
+      [
+        notificationsToUpdate.map((r) => r.id),
+        notificationsToUpdate.map((r) => r.status),
+        notificationsToUpdate.map((r) => r.error),
+        notificationsToUpdate.map(() => new Date()),
+        notificationsToUpdate.map((r) => r.attemps),
+      ],
+    );
+    const notificationsStateMap: { [key: string]: DbNotificationState } = {};
+    notificationsState.forEach((ns) => {
+      if (ns.status == "retry") {
+        notificationsStateMap[ns.notification_id] = ns;
+      } else if (ns.status == "error") {
+        notificationsStateMap[ns.notification_id] = ns;
+      }
+    });
+    return notificationsStateMap;
   }
 
   private async sendMessagesNotifications(
     notifications: DbNotification[],
-  ): Promise<{ [key: string]: DbNotificationState }> {
-    return {};
+    retryNotificationsStates: DbNotificationState[],
+  ): Promise<DbNotificationState[]> {
+    const notificationsStatus: DbNotificationState[] = [];
+    notifications.forEach((n) => {
+      const currentAttemps = retryNotificationsStates.find(
+        (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+      )?.attemps;
+      const id = retryNotificationsStates.find(
+        (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+      )?.id;
+
+      notificationsStatus.push({
+        id: id ?? 0,
+        notification_id: n.id,
+        status: 'sent',
+        error: '',
+        send_date: new Date(),
+        attemps: currentAttemps ? currentAttemps + 1 : 1,
+        audience: n.audience,
+      });
+
+    });
+    return notificationsStatus;
   }
 
   private async sendCourseCompletionNotifications(
     notifications: DbNotification[],
-  ): Promise<{ [key: string]: DbNotificationState }> {
-    return {};
-  }
+    retryNotificationsStates: DbNotificationState[],
+  ): Promise<DbNotificationState[]> {
+    const notificationsStatus: DbNotificationState[] = [];
+    notifications.forEach((n) => {
+      const currentAttemps = retryNotificationsStates.find(
+        (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+      )?.attemps;
+      const id = retryNotificationsStates.find(
+        (rn) => rn.notification_id == n.id && rn.audience == n.audience,
+      )?.id;
 
-  private buildUnknown(notification: DbNotification): DbNotificationState {
-    return {
-      id: 0,
-      notification_id: notification.id,
-      status: "error",
-      error: "Unknown notification type",
-      send_date: new Date(),
-      attemps: notification.attemps ? notification.attemps + 1 : 1,
-      audience: notification.audience,
-    };
+      notificationsStatus.push({
+        id: id ?? 0,
+        notification_id: n.id,
+        status: n.content_type === 'application/json' ? 'sent' : 'error',
+        error: n.content_type === 'application/json' ? '' : 'Invalid content type',
+        send_date: new Date(),
+        attemps: currentAttemps ? currentAttemps + 1 : 1,
+        audience: n.audience,
+      });
+
+    });
+    return notificationsStatus;
   }
 }
