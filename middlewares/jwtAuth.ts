@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
-type AuthedRequest = Request & {
+export type AuthedRequest = Request & {
   user?: { id: string };
 };
 
