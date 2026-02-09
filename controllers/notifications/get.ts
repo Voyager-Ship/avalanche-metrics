@@ -3,17 +3,15 @@ import NotificationsGetter from "../../services/notifications/get";
 
 const notificationsGetter = new NotificationsGetter();
 
-type AuthedRequest = Request & { user?: { id: string } };
-
 export const getNotifications = async (req: Request, res: Response) => {
-  const userId: string | undefined = (req as AuthedRequest).user?.id;
+  const { authUser } = req.body as unknown as any;
 
-  if (!userId) {
-    return res.status(401).json({ error: "unauthorized" });
+  if (!authUser) {
+    return res.status(401).json({ error: "authUser field is required and must be an string" });
   }
 
   try {
-    const data = await notificationsGetter.getNotifications([userId]);
+    const data = await notificationsGetter.getNotifications([authUser]);
     return res.json(data);
   } catch (err: unknown) {
     console.error('Error at get notifications: ', err)

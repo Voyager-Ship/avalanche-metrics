@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express";
-import { AuthedRequest } from "./jwtAuth";
 
 type Bucket = {
   tokens: number;
@@ -67,14 +66,4 @@ export const createInMemoryRateLimit = (options: RateLimitOptions) => {
 export const resolveAppKey = (req: Request): string | null => {
   const v: string | undefined = req.header("x-api-key") ?? undefined;
   return v && v.trim().length > 0 ? v.trim() : null;
-};
-
-export const resolveAppKeyPlusUser = (req: Request): string | null => {
-  const userId: string | undefined = (req as AuthedRequest).user?.id;
-  if (!userId || userId.trim().length === 0) {
-    // si jwtAuth no puso user, no uses este limiter (mejor devolver null)
-    return null;
-  }
-
-  return `user:${userId.trim()}`;
 };
