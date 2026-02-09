@@ -36,7 +36,7 @@ export default class NotificationsSender {
     notifications.forEach((n) => {
       const dbAudience = n.audience
         .split(",")
-        .flatMap((u) => dbUsers.find((dbU) => dbU.id == u || dbU.email == u));
+        .flatMap((user) => dbUsers.find((dbUser) => dbUser.id == user || dbUser.email == user));
       dbAudience.forEach((u, i) => {
         if (u) {
           let added = false;
@@ -126,9 +126,6 @@ export default class NotificationsSender {
       inboxNotificationsToSend,
       inboxRetryNotificationsStates,
     );
-
-    console.log("EmailNotificationStatus: ", emailNotificationsStatus);
-    console.log("InboxNotificationStatus: ", inboxNotificationsStatus);
 
     notifications.forEach((n) => {
       n.status = "error";

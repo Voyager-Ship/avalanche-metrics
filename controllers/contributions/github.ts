@@ -40,9 +40,9 @@ export const getUsersContributions = async (req: Request, res: Response) => {
       return res.json(events);
     }
   } catch (err) {
+    console.error('Error at get contributions: ', err)
     return res.status(500).json({
-      error: "failed to fetch contributions",
-      details: String(err),
+      error: "Failed to fetch contributions"
     });
   }
 };

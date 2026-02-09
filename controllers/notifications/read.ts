@@ -18,9 +18,9 @@ export const readNotifications = async (req: Request, res: Response) => {
     await notificationsReader.readNotifications(userId ?? '', req.body);
     return res.json({ success: true });
   } catch (err) {
+    console.error('Error at read notifications: ', err)
     return res.status(500).json({
-      error: "failed to create notifications",
-      details: String(err),
+      error: "Failed to create notifications"
     });
   }
 };

@@ -7,13 +7,32 @@ import dns from "node:dns";
 
 dns.setDefaultResultOrder("ipv4first");
 const app = express();
+
+const allowedOrigins: string[] = [
+  "https://avalanche-docs-eight.vercel.app",
+  "https://build.avax.network",
+  "http://localhost:3001",
+];
+
 app.use(
   cors({
-    origin: "*",
+    origin: (origin: string | undefined, callback) => {
+      // Permite requests sin Origin (curl, health checks, server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"), false);
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
   }),
 );
+
 
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ extended: false, limit: "500mb" }));

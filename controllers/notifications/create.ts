@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import NotificationsCreator from "../../services/notifications/create";
-import { AuthedRequest } from '../../types/common'
-
+import { AuthedRequest } from "../../types/common";
 
 const notificationsCreator = new NotificationsCreator();
 
@@ -19,12 +18,15 @@ export const createNotifications = async (req: Request, res: Response) => {
   }
 
   try {
-    await notificationsCreator.createNotifications((req as unknown as AuthedRequest).user?.id ?? '', notifications);
+    await notificationsCreator.createNotifications(
+      (req as unknown as AuthedRequest).user?.id ?? "",
+      notifications,
+    );
     return res.json({ success: true });
   } catch (err) {
+    console.error("Error at create notifications: ", err);
     return res.status(500).json({
-      error: "failed to create notifications",
-      details: String(err),
+      error: "Failed to create notifications",
     });
   }
 };

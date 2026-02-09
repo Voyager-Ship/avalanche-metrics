@@ -22,9 +22,9 @@ export const getUsersActivity = async (req: Request, res: Response) => {
     const events = await merge.getUsersActivity(users, projects, page);
     return res.json(events);
   } catch (err) {
+    console.error('Error at get activity data: ', err)
     return res.status(500).json({
-      error: "failed to fetch activity",
-      details: String(err),
+      error: "failed to fetch activity"
     });
   }
 };

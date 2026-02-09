@@ -39,9 +39,9 @@ export const getAdressesContracts = async (req: Request, res: Response) => {
       return res.json(contracts);
     }
   } catch (err) {
+    console.error('Error at fetch contract: ', err)
     return res.status(500).json({
-      error: "failed to fetch contracts",
-      details: String(err),
+      error: "failed to fetch contracts"
     });
   }
 };

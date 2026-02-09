@@ -10,12 +10,10 @@ const BUILDER_HUB_URL: string | undefined =
 export async function jwtAuth(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   if (!BUILDER_HUB_URL) {
-    res
-      .status(500)
-      .json({ error: "Error at validate jwt token" });
+    res.status(500).json({ error: "Error at validate jwt token" });
     return;
   }
 
@@ -26,34 +24,32 @@ export async function jwtAuth(
   }
 
   try {
-    const response = await fetch(
-      `${BUILDER_HUB_URL}/api/validate-jwt-token`,
-      {
-        method: "POST",
-        headers: {
-          authorization: authHeader,
-          "content-type": "application/json",
-        },
-      }
-    );
+    const response = await fetch(`${BUILDER_HUB_URL}/api/validate-jwt-token`, {
+      method: "POST",
+      headers: {
+        authorization: authHeader,
+        "content-type": "application/json",
+      },
+    });
 
     if (!response.ok) {
       const text: string = await response.text();
-      res.status(401).json({ error: "invalid token", details: text });
+      res.status(401).json({ error: "invalid token" });
       return;
     }
 
-    const data: { valid: boolean, message: string, sub: string } = await response.json();
+    const data: { valid: boolean; message: string; sub: string } =
+      await response.json();
     if (data.valid) {
       (req as AuthedRequest).user = { id: data.sub };
-      next()
+      next();
     } else {
-      res.status(401).json({ error: "invalid token", details: data.message });
+      res.status(401).json({ error: "invalid token" });
     }
   } catch (err: unknown) {
+    console.error('Error at validate token: ', err)
     res.status(401).json({
       error: "token validation service error",
-      details: String(err),
     });
   }
 }

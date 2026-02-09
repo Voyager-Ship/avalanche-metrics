@@ -16,9 +16,9 @@ export const getNotifications = async (req: Request, res: Response) => {
     const data = await notificationsGetter.getNotifications([userId]);
     return res.json(data);
   } catch (err: unknown) {
+    console.error('Error at get notifications: ', err)
     return res.status(500).json({
-      error: "failed to get notifications",
-      details: String(err),
+      error: "Failed to get notifications"
     });
   }
 };
